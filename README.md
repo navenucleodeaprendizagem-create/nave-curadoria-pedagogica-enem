@@ -98,3 +98,20 @@ Repositório remoto:
 
 GitHub — nave-curadoria-pedagogica-enem
 
+## Ambiente local de desenvolvimento
+
+O desenvolvimento oficial do projeto é realizado em:
+
+`C:\NAVE\MVP_Quimica\Apps Script`
+
+Editor:
+- Visual Studio Code
+
+Sincronização com Google Apps Script:
+- clasp
+
+Controle de versões:
+- Git
+
+Repositório remoto:
+- GitHub

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body{
+      font-family:Arial,sans-serif;
+      margin:0;
+      padding:16px;
+      background:#f8fafc;
+      color:#1f2937
+    }
+    h2{margin:0 0 12px;color:#0f766e}
+    .filtros,.resumo,.card{
+      background:#fff;
+      border:1px solid #dbe4e8;
+      border-radius:10px;
+      padding:12px;
+      margin-bottom:12px
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px
+    }
+    label{
+      font-size:12px;
+      font-weight:bold;
+      color:#475569
+    }
+    select{
+      width:100%;
+      padding:8px;
+      box-sizing:border-box;
+      border:1px solid #cbd5e1;
+      border-radius:6px;
+      margin-top:4px
+    }
+    .resumo{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:8px;
+      text-align:center
+    }
+    .kpi{
+      background:#f1f5f9;
+      padding:8px;
+      border-radius:6px
+    }
+    .kpi strong{
+      display:block;
+      font-size:18px;
+      color:#0f766e
+    }
+    .card{
+      border-left:6px solid #94a3b8
+    }
+    .critica{border-left-color:#ef4444}
+    .alta{border-left-color:#f97316}
+    .normal{border-left-color:#eab308}
+    .baixa{border-left-color:#38bdf8}
+    .linha{
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      margin-bottom:6px
+    }
+    .id{
+      font-weight:bold;
+      color:#0f766e
+    }
+    .tag{
+      font-size:11px;
+      padding:4px 7px;
+      border-radius:999px;
+      background:#e2e8f0
+    }
+    .texto{
+      font-size:12px;
+      line-height:1.4;
+      margin:6px 0
+    }
+    button{
+      width:100%;
+      padding:9px;
+      border:0;
+      border-radius:6px;
+      cursor:pointer;
+      font-weight:bold;
+      margin-top:7px
+    }
+    .principal{background:#0f766e;color:#fff}
+    .secundario{
+      background:#fff;
+      color:#0f766e;
+      border:1px solid #0f766e
+    }
+    .vazio{
+      padding:16px;
+      text-align:center;
+      color:#64748b
+    }
+  </style>
+</head>
+<body>
+  <h2>Pendências da coordenação</h2>
+
+  <div class="filtros">
+    <div class="grid">
+      <label>Prioridade
+        <select id="prioridade"></select>
+      </label>
+      <label>Status
+        <select id="status"></select>
+      </label>
+      <label>Habilidade
+        <select id="habilidade"></select>
+      </label>
+      <label>Professor
+        <select id="professor"></select>
+      </label>
+    </div>
+
+    <label style="display:block;margin-top:10px">
+      <input id="somentePendentes" type="checkbox" checked>
+      Mostrar somente pendentes
+    </label>
+  </div>
+
+  <div class="resumo">
+    <div class="kpi"><strong id="total">0</strong>Total</div>
+    <div class="kpi"><strong id="pendentes">0</strong>Pendentes</div>
+    <div class="kpi"><strong id="resolvidos">0</strong>Resolvidos</div>
+  </div>
+
+  <div id="lista"></div>
+
+  <script>
+    let primeiraCarga = true;
+
+    function preencherSelect(id, valores){
+      const el = document.getElementById(id);
+      const atual = el.value;
+      el.innerHTML = '';
+
+      valores.forEach(v => {
+        const op = document.createElement('option');
+        op.value = v;
+        op.textContent = v;
+        el.appendChild(op);
+      });
+
+      if ([...el.options].some(o => o.value === atual)) {
+        el.value = atual;
+      }
+    }
+
+    function filtros(){
+      return {
+        prioridade: document.getElementById('prioridade').value || 'Todas',
+        status: document.getElementById('status').value || 'Todos',
+        habilidade: document.getElementById('habilidade').value || 'Todas',
+        professor: document.getElementById('professor').value || 'Todos',
+        somentePendentes:
+          document.getElementById('somentePendentes').checked
+      };
+    }
+
+    function carregar(){
+      google.script.run
+        .withSuccessHandler(renderizar)
+        .withFailureHandler(e => alert(e.message))
+        .listarCasosCoordenacaoV05(filtros());
+    }
+
+    function renderizar(r){
+      if (primeiraCarga) {
+        preencherSelect('prioridade', r.filtros.prioridades);
+        preencherSelect('status', r.filtros.status);
+        preencherSelect('habilidade', r.filtros.habilidades);
+        preencherSelect('professor', r.filtros.professores);
+        primeiraCarga = false;
+      }
+
+      document.getElementById('total').textContent = r.resumo.total;
+      document.getElementById('pendentes').textContent = r.resumo.pendentes;
+      document.getElementById('resolvidos').textContent = r.resumo.resolvidos;
+
+      const lista = document.getElementById('lista');
+      lista.innerHTML = '';
+
+      if (!r.casos.length) {
+        lista.innerHTML =
+          '<div class="vazio">Nenhum caso encontrado.</div>';
+        return;
+      }
+
+      r.casos.forEach(c => {
+        const div = document.createElement('div');
+        const classe = (c.prioridade || '').toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '');
+
+        div.className = 'card ' + classe;
+
+        div.innerHTML = `
+          <div class="linha">
+            <span class="id">${c.idQuestao}</span>
+            <span class="tag">${c.prioridade}</span>
+          </div>
+          <div class="linha">
+            <span>${c.habilidade}</span>
+            <span class="tag">${c.statusFila}</span>
+          </div>
+          <div class="texto"><strong>Professor:</strong> ${c.professor}</div>
+          <div class="texto"><strong>Objeto:</strong> ${c.objetoAtual}</div>
+          <div class="texto"><strong>Divergências:</strong> ${c.divergencias}</div>
+          <div class="texto"><strong>Parecer:</strong> ${c.parecer}</div>
+          <div class="texto"><strong>Entrada:</strong> ${c.dataEntrada}</div>
+        `;
+
+        const btDecidir = document.createElement('button');
+        btDecidir.className = 'principal';
+        btDecidir.textContent = c.resolvido
+          ? 'Visualizar decisão'
+          : 'Decidir caso';
+        btDecidir.onclick = () => {
+          google.script.run
+            .withFailureHandler(e => alert(e.message))
+            .abrirDecisaoPorIdValidacaoV05(c.idValidacao);
+        };
+
+        const btLocalizar = document.createElement('button');
+        btLocalizar.className = 'secundario';
+        btLocalizar.textContent = 'Localizar na planilha';
+        btLocalizar.onclick = () => {
+          google.script.run
+            .withFailureHandler(e => alert(e.message))
+            .localizarCasoNaFilaV05(c.idValidacao);
+        };
+
+        div.appendChild(btDecidir);
+        div.appendChild(btLocalizar);
+        lista.appendChild(div);
+      });
+    }
+
+    [
+      'prioridade',
+      'status',
+      'habilidade',
+      'professor',
+      'somentePendentes'
+    ].forEach(id => {
+      document.getElementById(id).addEventListener('change', carregar);
+    });
+
+    carregar();
+  </script>
+</body>
+</html>

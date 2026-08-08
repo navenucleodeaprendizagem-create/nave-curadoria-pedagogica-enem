@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body{
+      font-family:Arial,sans-serif;
+      margin:0;
+      padding:18px;
+      background:#f8fafc;
+      color:#1f2937
+    }
+    h2{
+      margin:0 0 14px;
+      color:#0f766e
+    }
+    .card{
+      background:#fff;
+      border:1px solid #dbe4e8;
+      border-radius:10px;
+      padding:14px;
+      margin-bottom:14px
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px
+    }
+    .item{
+      background:#f1f5f9;
+      padding:8px;
+      border-radius:6px;
+      font-size:12px
+    }
+    .label{
+      font-weight:bold;
+      color:#475569
+    }
+    .trecho{
+      white-space:pre-wrap;
+      line-height:1.5;
+      font-size:13px;
+      max-height:320px;
+      overflow-y:auto
+    }
+    .alerta{
+      background:#fef3c7;
+      padding:10px;
+      border-radius:6px;
+      margin-top:10px;
+      display:none
+    }
+    .fonte{
+      background:#e0f2fe;
+      padding:10px;
+      border-radius:6px;
+      margin-top:10px
+    }
+    .validacao{
+      background:#f1f5f9;
+      padding:10px;
+      border-radius:6px;
+      margin-top:10px
+    }
+    button,a.botao{
+      width:100%;
+      box-sizing:border-box;
+      display:block;
+      text-align:center;
+      text-decoration:none;
+      padding:11px;
+      margin-top:10px;
+      border:0;
+      border-radius:7px;
+      font-weight:bold;
+      cursor:pointer
+    }
+    .principal{
+      background:#0f766e;
+      color:#fff
+    }
+    .validar{
+      background:#d1fae5;
+      color:#065f46;
+      border:1px solid #10b981
+    }
+    .secundario{
+      background:#fff;
+      color:#0f766e;
+      border:1px solid #0f766e
+    }
+    .desabilitado{
+      background:#e2e8f0;
+      color:#64748b;
+      cursor:not-allowed
+    }
+    .status{
+      margin-top:10px;
+      padding:9px;
+      border-radius:6px;
+      background:#d1fae5;
+      display:none
+    }
+  </style>
+</head>
+<body>
+  <h2>Visualizar questão</h2>
+
+  <div class="card">
+    <div class="grid">
+      <div class="item">
+        <span class="label">ID</span><br>
+        <span id="id"></span>
+      </div>
+      <div class="item">
+        <span class="label">Ano/Edição</span><br>
+        <span id="edicao"></span>
+      </div>
+      <div class="item">
+        <span class="label">Competência/Habilidade</span><br>
+        <span id="habilidade"></span>
+      </div>
+      <div class="item">
+        <span class="label">Dificuldade</span><br>
+        <span id="dificuldade"></span>
+      </div>
+      <div class="item">
+        <span class="label">Função pedagógica</span><br>
+        <span id="funcao"></span>
+      </div>
+      <div class="item">
+        <span class="label">Tempo estimado</span><br>
+        <span id="tempo"></span>
+      </div>
+      <div class="item">
+        <span class="label">Status da curadoria</span><br>
+        <span id="statusCuradoria"></span>
+      </div>
+      <div class="item">
+        <span class="label">Reportes</span><br>
+        <span id="reportes"></span>
+      </div>
+    </div>
+
+    <div class="validacao">
+      <span class="label">Validação docente</span><br>
+      <span id="statusValidacao">Carregando...</span>
+    </div>
+
+    <p class="label">Objeto de conhecimento</p>
+    <div id="objeto"></div>
+
+    <p class="label">Trecho inicial disponível</p>
+    <div class="trecho" id="trecho"></div>
+
+    <div id="alerta" class="alerta"></div>
+
+    <div class="fonte">
+      <strong>Fonte</strong><br>
+      <span id="colecao"></span><br>
+      Página: <span id="pagina"></span><br>
+      Status do vínculo: <span id="statusFonte"></span>
+    </div>
+  </div>
+
+  <a
+    id="abrirPdf"
+    class="botao principal desabilitado"
+    href="#"
+    target="_blank"
+  >
+    Abrir PDF de origem
+  </a>
+
+  <button
+    class="validar"
+    onclick="validarQuestao()"
+  >
+    Validar questão
+  </button>
+
+  <button
+    class="principal"
+    onclick="adicionar()"
+  >
+    Adicionar à sequência
+  </button>
+
+  <button
+    class="secundario"
+    onclick="corrigir()"
+  >
+    Corrigir trecho
+  </button>
+
+  <button
+    class="secundario"
+    onclick="reportar()"
+  >
+    Reportar ajuste
+  </button>
+
+  <div id="mensagem" class="status"></div>
+
+  <script>
+    let idQuestao = '<?= idQuestao ?>';
+    let ultimoIdCarregado = '';
+
+    function mostrar(msg){
+      const el = document.getElementById('mensagem');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function carregar(id){
+      if(!id || id === ultimoIdCarregado) return;
+
+      ultimoIdCarregado = id;
+      idQuestao = id;
+
+      google.script.run
+        .withSuccessHandler(renderizar)
+        .withFailureHandler(e => mostrar(e.message))
+        .obterDadosQuestaoCompletaV04(id);
+
+      google.script.run
+        .withSuccessHandler(renderizarStatusValidacao)
+        .withFailureHandler(() => {
+          document.getElementById('statusValidacao').textContent =
+            'Não avaliada';
+        })
+        .obterDadosValidacaoV05(id);
+    }
+
+    function renderizar(d){
+      document.getElementById('id').textContent = d.id || '';
+      document.getElementById('edicao').textContent =
+        `${d.ano || ''} / ${d.edicao || ''}`;
+      document.getElementById('habilidade').textContent =
+        `${d.competencia || ''} / ${d.habilidade || ''}`;
+      document.getElementById('dificuldade').textContent =
+        d.dificuldade || '';
+      document.getElementById('funcao').textContent =
+        d.funcao || '';
+      document.getElementById('tempo').textContent =
+        (d.tempo || 0) + ' min';
+      document.getElementById('statusCuradoria').textContent =
+        d.status || '';
+      document.getElementById('reportes').textContent =
+        d.reportes || 0;
+      document.getElementById('objeto').textContent =
+        d.objeto || '';
+      document.getElementById('trecho').textContent =
+        d.trecho || 'Trecho não disponível.';
+      document.getElementById('colecao').textContent =
+        d.colecao || '';
+      document.getElementById('pagina').textContent =
+        d.pagina || '';
+      document.getElementById('statusFonte').textContent =
+        d.statusFonte || '';
+
+      const alerta = document.getElementById('alerta');
+      if(d.alerta){
+        alerta.textContent =
+          `Alerta ${d.nivelAlerta || ''}: ${d.alerta}`;
+        alerta.style.display = 'block';
+      }else{
+        alerta.style.display = 'none';
+      }
+
+      const link = document.getElementById('abrirPdf');
+
+      if(d.pdfDisponivel && d.urlPdf){
+        link.href = d.urlPdf;
+        link.classList.remove('desabilitado');
+        link.classList.add('principal');
+        link.textContent =
+          `Abrir PDF de origem — ir à página ${d.pagina || ''}`;
+      }else{
+        link.href = '#';
+        link.classList.add('desabilitado');
+        link.textContent =
+          'PDF de origem não configurado';
+      }
+    }
+
+    function renderizarStatusValidacao(d){
+      const status = d && d.statusValidacao
+        ? d.statusValidacao
+        : 'Não avaliada';
+
+      document.getElementById('statusValidacao').textContent = status;
+    }
+
+    function validarQuestao(){
+      if(!idQuestao){
+        mostrar('Selecione uma questão válida.');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(() => {})
+        .withFailureHandler(e => mostrar(e.message))
+        .abrirValidacaoQuestaoPorIdV05(idQuestao);
+    }
+
+    function adicionar(){
+      google.script.run
+        .withSuccessHandler(m => mostrar(m))
+        .withFailureHandler(e => mostrar(e.message))
+        .adicionarQuestaoPorId(idQuestao);
+    }
+
+    function corrigir(){
+      google.script.run
+        .withFailureHandler(e => mostrar(e.message))
+        .abrirCorrecaoTrechoV04();
+    }
+
+    function reportar(){
+      google.script.run
+        .withFailureHandler(e => mostrar(e.message))
+        .abrirSidebarReporte();
+    }
+
+    carregar(idQuestao);
+
+    setInterval(() => {
+      google.script.run
+        .withSuccessHandler(idAtual => {
+          if(idAtual && idAtual !== ultimoIdCarregado){
+            carregar(idAtual);
+          }
+        })
+        .obterIdQuestaoSelecionadaAtualV04();
+    }, 1800);
+  </script>
+</body>
+</html>

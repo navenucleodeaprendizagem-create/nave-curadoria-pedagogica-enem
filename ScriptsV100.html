@@ -1,0 +1,2014 @@
+<script>
+const estado = {
+  inicial: null,
+  resultados: [],
+  selecionados: new Set(),
+  sequencia: { itens: [], tempoTotal: 0 },
+  questaoAtual: null,
+  usuario: null,
+  areaAtual: '',
+  disciplinaAtual: '',
+  habilidadesPorCompetencia: {},
+  taxonomiaCadastro: null,
+  permissoes: null,
+  usuarios: [],
+  coordenacao: { casos: [], decisoes: [] },
+  editoracao: {
+    projetos: [],
+    projetoAtual: null
+  },
+  performance: {
+    filtrosChave: '',
+    filtrosCarregando: false,
+    filtrosProntos: false,
+    carregamentos: {}
+  }
+};
+
+document.addEventListener('DOMContentLoaded', iniciarAplicacao);
+
+function iniciarAplicacao() {
+  vincularEventos();
+  carregarEstadoInicial();
+}
+
+function vincularEventos() {
+  document.querySelectorAll('[data-view]').forEach(botao => {
+    botao.addEventListener('click', () => navegar(botao.dataset.view));
+  });
+
+  document.querySelectorAll('[data-ir]').forEach(botao => {
+    botao.addEventListener('click', () => navegar(botao.dataset.ir));
+  });
+
+  document
+    .getElementById('btn-buscar')
+    .addEventListener('click', executarBusca);
+
+  document
+    .getElementById('btn-limpar-filtros')
+    .addEventListener('click', limparFiltros);
+
+  document
+    .getElementById('filtro-area')
+    .addEventListener('change', () => {
+      carregarEstadoInicial(
+        document.getElementById('filtro-area').value,
+        ''
+      );
+    });
+
+  document
+    .getElementById('filtro-disciplina')
+    .addEventListener('change', () => {
+      carregarEstadoInicial(
+        document.getElementById('filtro-area').value,
+        document.getElementById('filtro-disciplina').value
+      );
+    });
+
+  document
+    .getElementById('filtro-competencia')
+    .addEventListener('change', atualizarHabilidadesBuscaPorCompetencia);
+
+  document
+    .getElementById('cad-area')
+    .addEventListener('change', atualizarCadastroPorArea);
+
+  document
+    .getElementById('cad-disciplina')
+    .addEventListener('change', carregarTaxonomiaCadastro);
+
+  document
+    .getElementById('cad-competencia')
+    .addEventListener('change', atualizarHabilidadesCadastroPorCompetencia);
+
+  document
+    .getElementById('form-cadastro-questao')
+    .addEventListener('submit', cadastrarQuestaoManualWeb);
+
+  document
+    .getElementById('btn-adicionar-sequencia')
+    .addEventListener('click', adicionarSelecionadas);
+
+  document
+    .getElementById('fechar-modal')
+    .addEventListener('click', () =>
+      document.getElementById('modal-questao').close()
+    );
+
+  document
+    .getElementById('btn-validar-questao')
+    .addEventListener('click', abrirValidacaoQuestaoAtual);
+
+  document
+    .getElementById('fechar-validacao')
+    .addEventListener('click', () =>
+      document.getElementById('modal-validacao').close()
+    );
+
+  document
+    .getElementById('form-validacao')
+    .addEventListener('submit', salvarValidacaoWeb);
+
+  document
+    .getElementById('btn-salvar-sequencia')
+    .addEventListener('click', abrirSalvarSequencia);
+
+  document
+    .getElementById('btn-limpar-sequencia')
+    .addEventListener('click', limparSequenciaAtualWeb);
+
+  document
+    .getElementById('fechar-salvar-sequencia')
+    .addEventListener('click', () =>
+      document.getElementById('modal-salvar-sequencia').close()
+    );
+
+  document
+    .getElementById('form-salvar-sequencia')
+    .addEventListener('submit', salvarSequenciaAtualWeb);
+
+  vincularCamposValidacao();
+
+  document
+    .getElementById('btn-novo-usuario')
+    .addEventListener('click', abrirNovoUsuarioWebV150);
+
+  document
+    .getElementById('fechar-modal-usuario')
+    .addEventListener('click', () =>
+      document.getElementById('modal-usuario').close()
+    );
+
+  document
+    .getElementById('btn-cancelar-usuario')
+    .addEventListener('click', () =>
+      document.getElementById('modal-usuario').close()
+    );
+
+  document
+    .getElementById('form-usuario')
+    .addEventListener('submit', salvarUsuarioWebV150);
+
+  document.getElementById('coord-filtro-status')
+    .addEventListener('change', renderizarFilaCoordenacaoWebV160);
+  document.getElementById('coord-filtro-prioridade')
+    .addEventListener('change', renderizarFilaCoordenacaoWebV160);
+  document.getElementById('coord-fechar-modal')
+    .addEventListener('click', fecharModalCoordenacaoWebV160);
+  document.getElementById('coord-cancelar')
+    .addEventListener('click', fecharModalCoordenacaoWebV160);
+  document.getElementById('coord-form-decisao')
+    .addEventListener('submit', salvarDecisaoCoordenacaoInterfaceWebV160);
+
+  document.getElementById('ed-fechar-modal')
+    .addEventListener('click', () =>
+      document.getElementById('modal-editoracao').close()
+    );
+
+  document.getElementById('ed-fechar-recorte')
+    .addEventListener('click', () =>
+      document.getElementById('modal-metadados-recorte').close()
+    );
+
+  document.getElementById('ed-form-recorte')
+    .addEventListener('submit', salvarMetadadosRecorteInterfaceV170);
+
+  document.getElementById('ed-gerar-pacote')
+    .addEventListener('click', gerarPacoteEditoracaoInterfaceV170);
+}
+
+function carregarEstadoInicial(area, disciplina) {
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(dados => {
+      estado.inicial = dados;
+      estado.sequencia = dados.sequencia;
+      estado.permissoes = dados.permissoes || {};
+      estado.performance.filtrosProntos = false;
+      estado.performance.filtrosChave = '';
+
+      aplicarPermissoesInterfaceWebV150({
+        usuario: dados.usuarioDetalhes || {},
+        permissoes: dados.permissoes || {}
+      });
+
+      renderizarEstadoInicial(dados);
+      mostrarCarregando(false);
+
+      if (viewAtualWebV190() === 'busca') {
+        carregarFiltrosBuscaWebV190();
+      }
+    })
+    .withFailureHandler(tratarErro)
+    .obterBootstrapWebV190(
+      area || '',
+      disciplina || ''
+    );
+}
+
+function renderizarEstadoInicial(dados) {
+  estado.usuario = dados.usuarioDetalhes || null;
+
+  document.getElementById('usuario-nome').textContent =
+    estado.usuario && estado.usuario.nome
+      ? estado.usuario.nome
+      : (dados.usuario || 'Usuário autorizado');
+
+  estado.areaAtual = dados.contexto.area;
+  estado.disciplinaAtual = dados.contexto.disciplina;
+
+  document.getElementById('usuario-disciplina').textContent =
+    estado.usuario
+      ? (
+          estado.usuario.perfil +
+          ' · ' +
+          (dados.contexto.disciplina || dados.contexto.areaNome || '')
+        )
+      : (dados.contexto.disciplina || '');
+
+  preencherAreasWeb(dados.filtros.areas);
+
+  document.getElementById('filtro-area').value =
+    dados.contexto.area;
+
+  preencherSelect(
+    'filtro-disciplina',
+    dados.filtros.disciplinas,
+    false
+  );
+
+  document.getElementById('filtro-disciplina').value =
+    dados.contexto.disciplina;
+
+  preencherAreasCadastro(dados.filtros.areas);
+
+  document.getElementById('kpi-questoes').textContent =
+    formatarNumero(dados.indicadores.questoes);
+
+  document.getElementById('kpi-sequencia').textContent =
+    dados.indicadores.sequencia;
+
+  document.getElementById('kpi-tempo').textContent =
+    dados.indicadores.tempoSequencia + ' minutos';
+
+  document.getElementById('kpi-fila').textContent =
+    dados.indicadores.filaCoordenacao;
+
+  document.getElementById('kpi-projetos').textContent =
+    dados.indicadores.projetosEditoriais;
+
+  estado.habilidadesPorCompetencia =
+    dados.filtros.habilidadesPorCompetencia || {};
+
+  preencherSelect(
+    'filtro-competencia',
+    ordenarCodigosWebV142(dados.filtros.competencias || [])
+  );
+
+  atualizarHabilidadesBuscaPorCompetencia();
+
+  [
+    'filtro-objeto',
+    'filtro-dificuldade',
+    'filtro-ano',
+    'filtro-edicao',
+    'filtro-funcao',
+    'filtro-validacao'
+  ].forEach(id => preencherSelect(id, []));
+
+  renderizarSequencia(dados.sequencia);
+}
+
+function preencherSelect(id, opcoes, incluirTodos = true) {
+  const select = document.getElementById(id);
+  select.innerHTML = '';
+
+  if (incluirTodos) {
+    const todos = document.createElement('option');
+    todos.value = 'Todos';
+    todos.textContent = 'Todos';
+    select.appendChild(todos);
+  }
+
+  (opcoes || []).forEach(valor => {
+    const option = document.createElement('option');
+    option.value = valor;
+    option.textContent = valor;
+    select.appendChild(option);
+  });
+}
+
+function navegar(view) {
+  document.querySelectorAll('.view').forEach(el => {
+    el.classList.toggle('ativo', el.id === 'view-' + view);
+  });
+
+  document.querySelectorAll('.nav-item[data-view]').forEach(el => {
+    el.classList.toggle('ativo', el.dataset.view === view);
+  });
+
+  const titulos = {
+    inicio: ['Início', 'Visão geral do ambiente de curadoria.'],
+    busca: [
+      'Buscar questões',
+      'Filtre, visualize e selecione questões para a sequência.'
+    ],
+    sequencia: [
+      'Sequência atual',
+      'Acompanhe a composição pedagógica em andamento.'
+    ],
+    validacoes: [
+      'Validações',
+      'Registre e acompanhe suas validações docentes.'
+    ],
+    'minhas-sequencias': [
+      'Minhas sequências',
+      'Acesse as sequências salvas com sua conta.'
+    ],
+    cadastro: [
+      'Cadastrar questão',
+      'Inclua uma questão nova no banco para posterior validação.'
+    ],
+    usuarios: [
+      'Usuários e permissões',
+      'Gerencie perfis, disciplinas autorizadas e status de acesso.'
+    ],
+    coordenacao: [
+      'Coordenação',
+      'Analise divergências docentes e governe a curadoria pedagógica.'
+    ],
+    editoracao: [
+      'Editoração',
+      'Transforme sequências salvas em cadernos prontos para impressão.'
+    ]
+  };
+
+  const [titulo, subtitulo] = titulos[view] || titulos.inicio;
+  document.getElementById('titulo-pagina').textContent = titulo;
+  document.getElementById('subtitulo-pagina').textContent = subtitulo;
+
+  if (view === 'busca') carregarFiltrosBuscaWebV190();
+
+  if (
+    view === 'validacoes' &&
+    deveRecarregarViewWebV190('validacoes', 30000)
+  ) carregarResumoValidacoes();
+
+  if (
+    view === 'minhas-sequencias' &&
+    deveRecarregarViewWebV190('sequencias', 30000)
+  ) carregarMinhasSequencias();
+
+  if (
+    view === 'usuarios' &&
+    deveRecarregarViewWebV190('usuarios', 60000)
+  ) carregarUsuariosWebV150();
+
+  if (
+    view === 'coordenacao' &&
+    deveRecarregarViewWebV190('coordenacao', 20000)
+  ) carregarPainelCoordenacaoWebV160();
+
+  if (
+    view === 'editoracao' &&
+    deveRecarregarViewWebV190('editoracao', 30000)
+  ) carregarProjetosEditoracaoWebV170();
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+
+function viewAtualWebV190() {
+  const ativo = document.querySelector('.view.ativo');
+  return ativo
+    ? ativo.id.replace(/^view-/, '')
+    : 'inicio';
+}
+
+
+function chaveFiltrosWebV190() {
+  return [
+    estado.areaAtual || '',
+    estado.disciplinaAtual || ''
+  ].join('|');
+}
+
+
+function carregarFiltrosBuscaWebV190() {
+  const chave = chaveFiltrosWebV190();
+
+  if (
+    estado.performance.filtrosProntos &&
+    estado.performance.filtrosChave === chave
+  ) {
+    return;
+  }
+
+  if (estado.performance.filtrosCarregando) {
+    return;
+  }
+
+  estado.performance.filtrosCarregando = true;
+
+  const area = estado.areaAtual;
+  const disciplina = estado.disciplinaAtual;
+
+  google.script.run
+    .withSuccessHandler(filtros => {
+      estado.performance.filtrosCarregando = false;
+      estado.performance.filtrosProntos = true;
+      estado.performance.filtrosChave = chave;
+
+      estado.habilidadesPorCompetencia =
+        filtros.habilidadesPorCompetencia || {};
+
+      preencherSelect(
+        'filtro-competencia',
+        ordenarCodigosWebV142(
+          filtros.competencias || []
+        )
+      );
+
+      atualizarHabilidadesBuscaPorCompetencia();
+
+      preencherSelect(
+        'filtro-objeto',
+        filtros.objetos || []
+      );
+
+      preencherSelect(
+        'filtro-dificuldade',
+        filtros.dificuldades || []
+      );
+
+      preencherSelect(
+        'filtro-ano',
+        filtros.anos || []
+      );
+
+      preencherSelect(
+        'filtro-edicao',
+        filtros.edicoes || []
+      );
+
+      preencherSelect(
+        'filtro-funcao',
+        filtros.funcoes || []
+      );
+
+      preencherSelect(
+        'filtro-validacao',
+        filtros.statusValidacao || []
+      );
+    })
+    .withFailureHandler(erro => {
+      estado.performance.filtrosCarregando = false;
+      tratarErro(erro);
+    })
+    .obterFiltrosBuscaWebV190(
+      area,
+      disciplina
+    );
+}
+
+
+function deveRecarregarViewWebV190(chave, ttlMs) {
+  const agora = Date.now();
+  const anterior =
+    Number(
+      estado.performance.carregamentos[chave] || 0
+    );
+
+  if (
+    anterior &&
+    agora - anterior < ttlMs
+  ) {
+    return false;
+  }
+
+  estado.performance.carregamentos[chave] = agora;
+  return true;
+}
+
+
+function forcarReloadViewWebV190(chave) {
+  estado.performance.carregamentos[chave] = 0;
+}
+
+
+function executarBusca() {
+  const filtros = {
+    area: valor('filtro-area'),
+    disciplina: valor('filtro-disciplina'),
+    habilidade: valor('filtro-habilidade'),
+    competencia: valor('filtro-competencia'),
+    objeto: valor('filtro-objeto'),
+    dificuldade: valor('filtro-dificuldade'),
+    ano: valor('filtro-ano'),
+    edicao: valor('filtro-edicao'),
+    funcao: valor('filtro-funcao'),
+    statusValidacao: valor('filtro-validacao'),
+    quantidade: Number(valor('filtro-quantidade'))
+  };
+
+  estado.selecionados.clear();
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      estado.resultados = resposta.itens || [];
+      renderizarResultados();
+      mostrarCarregando(false);
+    })
+    .withFailureHandler(tratarErro)
+    .buscarQuestoesWebV140(filtros);
+}
+
+function renderizarResultados() {
+  const container = document.getElementById('resultados-busca');
+  const barra = document.getElementById('barra-resultados');
+
+  document.getElementById('contador-resultados').textContent =
+    estado.resultados.length + ' resultado(s)';
+
+  atualizarContadorSelecionados();
+
+  if (!estado.resultados.length) {
+    barra.classList.add('oculto');
+    container.innerHTML = `
+      <div class="estado-inicial">
+        <div class="icone-grande">∅</div>
+        <h3>Nenhuma questão encontrada</h3>
+        <p>Revise os filtros e faça uma nova busca.</p>
+      </div>
+    `;
+    return;
+  }
+
+  barra.classList.remove('oculto');
+  container.innerHTML = '';
+
+  estado.resultados.forEach(item => {
+    const card = document.createElement('article');
+    card.className = 'card-questao';
+    card.dataset.id = item.id;
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.setAttribute(
+      'aria-label',
+      'Selecionar questão ' + item.id
+    );
+
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) estado.selecionados.add(item.id);
+      else estado.selecionados.delete(item.id);
+
+      card.classList.toggle('selecionada', checkbox.checked);
+      atualizarContadorSelecionados();
+    });
+
+    const conteudo = document.createElement('div');
+    conteudo.innerHTML = `
+      <div class="questao-meta">
+        <span class="tag">${escapar(item.disciplina || '')}</span>
+        <span class="tag">${escapar(item.habilidade || 'Sem habilidade')}</span>
+        <span class="tag">${escapar(item.dificuldade || 'Sem dificuldade')}</span>
+        <span class="tag">${escapar(item.statusValidacao || 'Não avaliada')}</span>
+        <span class="tag">${Number(item.tempo || 0)} min</span>
+      </div>
+      <h3>${escapar(item.objeto || item.id)}</h3>
+      <p>${escapar(item.trecho || 'Trecho não disponível.')}</p>
+    `;
+
+    const visualizar = document.createElement('button');
+    visualizar.className = 'btn btn-secundario btn-visualizar';
+    visualizar.textContent = 'Visualizar';
+    visualizar.addEventListener('click', () =>
+      abrirQuestao(item.id)
+    );
+
+    card.append(checkbox, conteudo, visualizar);
+    container.appendChild(card);
+  });
+}
+
+function abrirQuestao(id) {
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(dados => {
+      renderizarModalQuestao(dados);
+      mostrarCarregando(false);
+      document.getElementById('modal-questao').showModal();
+    })
+    .withFailureHandler(tratarErro)
+    .obterQuestaoWebV140(id);
+}
+
+function renderizarModalQuestao(d) {
+  estado.questaoAtual = d;
+  document.getElementById('modal-id').textContent = d.id;
+
+  const linkPdf =
+    d.pdfDisponivel && d.urlPdf
+      ? `<a class="link-pdf" href="${atributo(d.urlPdf)}" target="_blank">
+          Abrir PDF de origem — ir à página ${escapar(d.pagina || '')}
+        </a>`
+      : `<p>PDF de origem indisponível: ${escapar(d.statusFonte || '')}</p>`;
+
+  document.getElementById('modal-corpo').innerHTML = `
+    <div class="detalhes-grid">
+      ${detalhe('Ano', d.ano)}
+      ${detalhe('Edição', d.edicao)}
+      ${detalhe('Habilidade', d.habilidade)}
+      ${detalhe('Competência', d.competencia)}
+      ${detalhe('Dificuldade', d.dificuldade)}
+      ${detalhe('Tempo estimado', (d.tempo || 0) + ' min')}
+    </div>
+    <div class="detalhe">
+      <span>Objeto de conhecimento</span>
+      <strong>${escapar(d.objeto || '')}</strong>
+    </div>
+    <h3>Trecho da questão</h3>
+    <div class="trecho-modal">${escapar(d.trecho || 'Trecho não disponível.')}</div>
+    ${linkPdf}
+  `;
+}
+
+function detalhe(rotulo, valorDetalhe) {
+  return `
+    <div class="detalhe">
+      <span>${escapar(rotulo)}</span>
+      <strong>${escapar(valorDetalhe || '—')}</strong>
+    </div>
+  `;
+}
+
+function adicionarSelecionadas() {
+  const ids = Array.from(estado.selecionados);
+
+  if (!ids.length) {
+    mostrarMensagem('Selecione pelo menos uma questão.', true);
+    return;
+  }
+
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      estado.sequencia = resposta.sequencia;
+      estado.selecionados.clear();
+      renderizarSequencia(resposta.sequencia);
+      renderizarResultados();
+      mostrarMensagem(resposta.mensagem);
+      mostrarCarregando(false);
+    })
+    .withFailureHandler(tratarErro)
+    .adicionarQuestoesSequenciaWebV130(ids);
+}
+
+function renderizarSequencia(sequencia) {
+  sequencia = sequencia || { itens: [], tempoTotal: 0 };
+  estado.sequencia = sequencia;
+
+  document.getElementById('seq-total').textContent =
+    sequencia.itens.length;
+
+  document.getElementById('seq-tempo').textContent =
+    sequencia.tempoTotal;
+
+  document.getElementById('kpi-sequencia').textContent =
+    sequencia.itens.length;
+
+  document.getElementById('kpi-tempo').textContent =
+    sequencia.tempoTotal + ' minutos';
+
+  const container = document.getElementById('lista-sequencia');
+  const resumoInicio =
+    document.getElementById('resumo-sequencia-inicio');
+
+  if (!sequencia.itens.length) {
+    container.className = 'lista-vazia';
+    container.innerHTML =
+      'A sequência atual ainda não possui questões.';
+
+    resumoInicio.className = 'lista-vazia';
+    resumoInicio.innerHTML =
+      'Nenhuma questão adicionada à sequência.';
+    return;
+  }
+
+  container.className = '';
+  container.innerHTML = sequencia.itens
+    .map(item => itemSequenciaHtml(item))
+    .join('');
+
+  resumoInicio.className = '';
+  resumoInicio.innerHTML = sequencia.itens
+    .slice(0, 4)
+    .map(item => itemSequenciaHtml(item))
+    .join('');
+}
+
+function itemSequenciaHtml(item) {
+  return `
+    <article class="item-sequencia">
+      <div class="ordem">${escapar(item.ordem)}</div>
+      <div>
+        <h3>${escapar(item.objeto || item.id)}</h3>
+        <p>
+          ${escapar(item.habilidade || '')}
+          · ${escapar(item.dificuldade || '')}
+          · ${Number(item.tempo || 0)} min
+        </p>
+      </div>
+      <button class="btn btn-secundario"
+        data-visualizar-id="${atributo(item.id)}">
+        Visualizar
+      </button>
+    </article>
+  `;
+}
+
+document.addEventListener('click', evento => {
+  const botao = evento.target.closest('[data-visualizar-id]');
+  if (botao) abrirQuestao(botao.dataset.visualizarId);
+});
+
+function limparFiltros() {
+  document
+    .querySelectorAll('#view-busca select')
+    .forEach(select => {
+      if (select.id === 'filtro-disciplina' || select.id === 'filtro-area') {
+        return;
+      }
+      select.selectedIndex =
+        select.id === 'filtro-quantidade' ? 2 : 0;
+    });
+}
+
+function atualizarContadorSelecionados() {
+  document.getElementById('contador-selecionados').textContent =
+    estado.selecionados.size + ' selecionado(s)';
+}
+
+function mostrarCarregando(visivel) {
+  document
+    .getElementById('carregando')
+    .classList.toggle('visivel', visivel);
+}
+
+function mostrarMensagem(texto, erro = false) {
+  const el = document.getElementById('mensagem-global');
+  if (!el) return;
+
+  el.textContent = texto;
+  el.className = 'mensagem visivel' + (erro ? ' erro' : '');
+
+  clearTimeout(window.__naveMensagemTimer);
+  window.__naveMensagemTimer = setTimeout(() => {
+    el.className = 'mensagem';
+  }, 5000);
+}
+
+
+function abrirValidacaoQuestaoAtual() {
+  const questao = estado.questaoAtual;
+
+  if (!questao || !questao.id) {
+    mostrarMensagem('Questão não identificada.', true);
+    return;
+  }
+
+  document.getElementById('modal-questao').close();
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(d => {
+      preencherFormularioValidacao(d);
+      mostrarCarregando(false);
+      document.getElementById('modal-validacao').showModal();
+    })
+    .withFailureHandler(tratarErro)
+    .obterDadosValidacaoWebV110(questao.id);
+}
+
+function preencherFormularioValidacao(d) {
+  const form = document.getElementById('form-validacao');
+  form.reset();
+
+  document.getElementById('val-idQuestao').value = d.id || '';
+  document.getElementById('validacao-id').textContent = d.id || '';
+
+  document.getElementById('resumo-validacao').innerHTML = `
+    <strong>${escapar(d.objeto || 'Objeto não informado')}</strong><br>
+    ${escapar(d.competencia || '')} / ${escapar(d.habilidade || '')}
+    · ${escapar(d.dificuldade || '')}
+    · ${escapar(d.funcao || '')}<br>
+    <small>Status atual: ${escapar(d.statusValidacao || 'Não avaliada')}</small>
+  `;
+
+  ['val-boxObjeto', 'val-boxAcao', 'val-boxDificuldade', 'val-boxFuncao']
+    .forEach(id => document.getElementById(id).classList.add('oculto'));
+}
+
+function vincularCamposValidacao() {
+  const mostrar = (selectId, condicao, boxId) => {
+    const select = document.getElementById(selectId);
+    select.addEventListener('change', () => {
+      document
+        .getElementById(boxId)
+        .classList
+        .toggle('oculto', !condicao(select.value));
+    });
+  };
+
+  mostrar(
+    'val-avaliacaoObjeto',
+    v => v === 'Incorreto',
+    'val-boxObjeto'
+  );
+
+  mostrar(
+    'val-avaliacaoAcao',
+    v => v === 'Incorreta',
+    'val-boxAcao'
+  );
+
+  mostrar(
+    'val-avaliacaoDificuldade',
+    v => ['Superestimada', 'Subestimada'].includes(v),
+    'val-boxDificuldade'
+  );
+
+  mostrar(
+    'val-avaliacaoFuncao',
+    v => v === 'Inadequada',
+    'val-boxFuncao'
+  );
+}
+
+function salvarValidacaoWeb(event) {
+  event.preventDefault();
+
+  const formEl = event.currentTarget;
+  const botao = document.getElementById('btn-salvar-validacao');
+  const form = Object.fromEntries(new FormData(formEl).entries());
+
+  botao.disabled = true;
+  botao.textContent = 'Registrando...';
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      mostrarCarregando(false);
+      document.getElementById('modal-validacao').close();
+
+      botao.disabled = false;
+      botao.textContent = 'Registrar validação';
+
+      mostrarMensagem(resposta.mensagem);
+
+      carregarEstadoInicial();
+      carregarResumoValidacoes();
+    })
+    .withFailureHandler(erro => {
+      botao.disabled = false;
+      botao.textContent = 'Registrar validação';
+      tratarErro(erro);
+    })
+    .salvarValidacaoWebV110(form);
+}
+
+function carregarResumoValidacoes() {
+  google.script.run
+    .withSuccessHandler(renderizarResumoValidacoes)
+    .withFailureHandler(tratarErro)
+    .obterResumoValidacoesWebV110();
+}
+
+function renderizarResumoValidacoes(dados) {
+  document.getElementById('val-total').textContent = dados.total || 0;
+  document.getElementById('val-sem-div').textContent =
+    dados.semDivergencia || 0;
+  document.getElementById('val-com-div').textContent =
+    dados.comDivergencia || 0;
+
+  const container = document.getElementById('lista-validacoes');
+
+  if (!dados.recentes || !dados.recentes.length) {
+    container.className = 'lista-vazia';
+    container.textContent = 'Nenhuma validação registrada por este usuário.';
+    return;
+  }
+
+  container.className = '';
+  container.innerHTML = dados.recentes.map(item => `
+    <article class="validacao-item">
+      <div>
+        <strong>${escapar(item.objeto || item.idQuestao)}</strong>
+        <small>
+          ${escapar(item.idQuestao)}
+          · ${escapar(item.habilidade || '')}
+          · ${escapar(item.data || '')}
+        </small>
+      </div>
+      <span class="tag">${escapar(item.status || '')}</span>
+    </article>
+  `).join('');
+}
+
+
+
+
+function preencherAreasWeb(areas) {
+  const select = document.getElementById('filtro-area');
+  select.innerHTML = '';
+
+  (areas || []).forEach(area => {
+    const option = document.createElement('option');
+    option.value = area.sigla;
+    option.textContent = area.nome;
+    select.appendChild(option);
+  });
+}
+
+function preencherAreasCadastro(areas) {
+  const select = document.getElementById('cad-area');
+  const valorAnterior = select.value;
+  select.innerHTML = '';
+
+  (areas || []).forEach(area => {
+    const option = document.createElement('option');
+    option.value = area.sigla;
+    option.textContent = area.nome;
+    option.dataset.disciplinas = JSON.stringify(area.disciplinas || []);
+    select.appendChild(option);
+  });
+
+  if ([...select.options].some(o => o.value === estado.areaAtual)) {
+    select.value = estado.areaAtual;
+  } else if (valorAnterior) {
+    select.value = valorAnterior;
+  }
+
+  atualizarCadastroPorArea();
+}
+
+function atualizarCadastroPorArea() {
+  const areaSelect = document.getElementById('cad-area');
+  const disciplinaSelect = document.getElementById('cad-disciplina');
+  const option = areaSelect.options[areaSelect.selectedIndex];
+
+  let disciplinas = [];
+
+  try {
+    disciplinas = JSON.parse(option?.dataset?.disciplinas || '[]');
+  } catch (_) {}
+
+  disciplinaSelect.innerHTML = '';
+
+  disciplinas.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d;
+    opt.textContent = d;
+    disciplinaSelect.appendChild(opt);
+  });
+
+  if (
+    disciplinas.includes(estado.disciplinaAtual) &&
+    areaSelect.value === estado.areaAtual
+  ) {
+    disciplinaSelect.value = estado.disciplinaAtual;
+  }
+
+  carregarTaxonomiaCadastro();
+}
+
+function carregarTaxonomiaCadastro() {
+  const area = document.getElementById('cad-area').value;
+  const disciplina = document.getElementById('cad-disciplina').value;
+
+  if (!area || !disciplina) return;
+
+  google.script.run
+    .withSuccessHandler(preencherTaxonomiaCadastro)
+    .withFailureHandler(tratarErro)
+    .obterTaxonomiaCadastroWebV140(area, disciplina);
+}
+
+function preencherTaxonomiaCadastro(dados) {
+  estado.taxonomiaCadastro = dados || {};
+
+  preencherSelectCadastro(
+    'cad-competencia',
+    dados.competencias || []
+  );
+
+  atualizarHabilidadesCadastroPorCompetencia();
+
+  preencherDatalist('lista-cad-objetos', dados.objetos);
+  preencherDatalist('lista-cad-macroobjetos', dados.macroobjetos);
+  preencherDatalist('lista-cad-acoes', dados.acoes);
+}
+
+function codigoNumericoWebV142(valor) {
+  const m = String(valor || '').match(/\d+/);
+  return m ? Number(m[0]) : 9999;
+}
+
+function ordenarCodigosWebV142(valores) {
+  return [...(valores || [])].sort(
+    (a, b) => codigoNumericoWebV142(a) - codigoNumericoWebV142(b)
+  );
+}
+
+function atualizarHabilidadesBuscaPorCompetencia() {
+  const competencia =
+    document.getElementById('filtro-competencia').value;
+
+  const mapa = estado.habilidadesPorCompetencia || {};
+  let habilidades;
+
+  if (competencia && competencia !== 'Todos') {
+    habilidades = mapa[competencia] || [];
+  } else {
+    habilidades = Object.values(mapa).flat();
+  }
+
+  preencherSelect(
+    'filtro-habilidade',
+    ordenarCodigosWebV142(habilidades)
+  );
+}
+
+function preencherSelectCadastro(id, valores) {
+  const select = document.getElementById(id);
+  select.innerHTML = '';
+
+  ordenarCodigosWebV142(valores).forEach(v => {
+    const option = document.createElement('option');
+    option.value = v;
+    option.textContent = v;
+    select.appendChild(option);
+  });
+}
+
+function atualizarHabilidadesCadastroPorCompetencia() {
+  const dados = estado.taxonomiaCadastro || {};
+  const mapa = dados.habilidadesPorCompetencia || {};
+  const competencia =
+    document.getElementById('cad-competencia').value;
+
+  const habilidades = competencia
+    ? (mapa[competencia] || [])
+    : (dados.habilidades || []);
+
+  preencherSelectCadastro(
+    'cad-habilidade',
+    habilidades
+  );
+}
+
+function preencherDatalist(id, valores) {
+  const lista = document.getElementById(id);
+  lista.innerHTML = '';
+
+  (valores || []).forEach(v => {
+    const option = document.createElement('option');
+    option.value = v;
+    lista.appendChild(option);
+  });
+}
+
+function cadastrarQuestaoManualWeb(event) {
+  event.preventDefault();
+
+  const form = Object.fromEntries(
+    new FormData(event.currentTarget).entries()
+  );
+
+  const confirmar = window.confirm(
+    'Cadastrar esta questão como classificação inicial e Não avaliada?'
+  );
+
+  if (!confirmar) return;
+
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      mostrarCarregando(false);
+      event.currentTarget.reset();
+
+      mostrarMensagem(
+        resposta.mensagem + ' ID: ' + resposta.id
+      );
+
+      carregarEstadoInicial(
+        resposta.area,
+        resposta.disciplina
+      );
+
+      navegar('busca');
+    })
+    .withFailureHandler(tratarErro)
+    .cadastrarQuestaoManualWebV140(form);
+}
+
+
+
+
+function carregarPainelCoordenacaoWebV160() {
+  if (!estado.permissoes || !estado.permissoes.coordenacao) return;
+
+  document.getElementById('coord-lista-casos').textContent =
+    'Carregando fila...';
+
+  google.script.run
+    .withSuccessHandler(dados => {
+      estado.coordenacao.casos = dados.casos || [];
+      estado.coordenacao.decisoes = dados.decisoes || [];
+
+      document.getElementById('coord-kpi-total').textContent =
+        dados.indicadores.total || 0;
+      document.getElementById('coord-kpi-pendentes').textContent =
+        dados.indicadores.pendentes || 0;
+      document.getElementById('coord-kpi-resolvidos').textContent =
+        dados.indicadores.resolvidos || 0;
+      document.getElementById('coord-kpi-devolvidos').textContent =
+        dados.indicadores.devolvidos || 0;
+
+      preencherPrioridadesCoordenacaoWebV160();
+      renderizarFilaCoordenacaoWebV160();
+    })
+    .withFailureHandler(tratarErro)
+    .obterPainelCoordenacaoWebV160();
+}
+
+function preencherPrioridadesCoordenacaoWebV160() {
+  const select = document.getElementById('coord-filtro-prioridade');
+  const prioridades = Array.from(new Set(
+    estado.coordenacao.casos
+      .map(c => c.prioridade)
+      .filter(v => v && v !== '—')
+  ));
+
+  select.innerHTML = '<option value="Todos">Todas</option>';
+
+  prioridades.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = p;
+    select.appendChild(opt);
+  });
+}
+
+function renderizarFilaCoordenacaoWebV160() {
+  const container = document.getElementById('coord-lista-casos');
+  const status = document.getElementById('coord-filtro-status').value;
+  const prioridade = document.getElementById('coord-filtro-prioridade').value;
+
+  let casos = [...estado.coordenacao.casos];
+
+  if (status === 'pendentes') casos = casos.filter(c => !c.resolvido);
+  if (status === 'resolvidos') casos = casos.filter(c => c.resolvido);
+  if (prioridade !== 'Todos') casos = casos.filter(c => c.prioridade === prioridade);
+
+  container.innerHTML = '';
+
+  if (!casos.length) {
+    container.innerHTML =
+      '<div class="lista-vazia">Nenhum caso para os filtros selecionados.</div>';
+    return;
+  }
+
+  casos.forEach(c => {
+    const card = document.createElement('article');
+    card.className = 'coord-caso' + (c.resolvido ? ' resolvido' : '');
+
+    const corpo = document.createElement('div');
+    corpo.innerHTML = `
+      <div class="coord-caso-topo">
+        <span class="coord-prioridade">${escapar(c.prioridade || '—')}</span>
+        <span class="coord-status">${escapar(c.status || '')}</span>
+        ${c.componente ? `<span class="tag">${escapar(c.componente)}</span>` : ''}
+        ${c.competencia ? `<span class="tag">${escapar(c.competencia)}</span>` : ''}
+        ${c.habilidade ? `<span class="tag">${escapar(c.habilidade)}</span>` : ''}
+      </div>
+      <h3>${escapar(c.idQuestao || c.idValidacao)}</h3>
+      <p><strong>Objeto:</strong> ${escapar(c.objeto || '—')}</p>
+      <p><strong>Divergência:</strong> ${escapar(c.divergencias || '—')}</p>
+      <p><strong>Professor:</strong> ${escapar(c.professor || '—')}
+        ${c.dataEntrada ? ' · ' + escapar(c.dataEntrada) : ''}</p>
+    `;
+
+    const botao = document.createElement('button');
+    botao.type = 'button';
+    botao.className = 'btn btn-secundario';
+    botao.textContent = c.resolvido ? 'Consultar' : 'Analisar';
+    botao.addEventListener('click', () =>
+      abrirCasoCoordenacaoWebV160(c.idValidacao, c.resolvido)
+    );
+
+    card.append(corpo, botao);
+    container.appendChild(card);
+  });
+}
+
+function abrirCasoCoordenacaoWebV160(idValidacao, resolvido) {
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(d => {
+      mostrarCarregando(false);
+      renderizarCasoCoordenacaoWebV160(d, resolvido);
+      document.getElementById('modal-coordenacao').showModal();
+    })
+    .withFailureHandler(tratarErro)
+    .obterCasoCoordenacaoWebV160(idValidacao);
+}
+
+function renderizarCasoCoordenacaoWebV160(d, resolvido) {
+  document.getElementById('coord-modal-id').textContent =
+    d.idQuestao || d.idValidacao || 'Caso';
+  document.getElementById('coord-id-validacao').value =
+    d.idValidacao || '';
+
+  document.getElementById('coord-modal-corpo').innerHTML = `
+    <div class="coord-resumo-grid">
+      ${coordResumoItemWebV160('Professor', d.professor)}
+      ${coordResumoItemWebV160('Componente', d.componente)}
+      ${coordResumoItemWebV160('Competência / habilidade',
+        [d.competencia, d.habilidade].filter(Boolean).join(' · '))}
+      ${coordResumoItemWebV160('Data da validação', d.dataValidacao)}
+      ${coordResumoItemWebV160('Status da fila', d.statusFila)}
+      ${coordResumoItemWebV160('Divergências', d.tiposDivergencia)}
+    </div>
+
+    <div class="coord-comparacao">
+      <div class="coord-bloco">
+        <h4>Classificação atual</h4>
+        <p><strong>Objeto:</strong> ${escapar(d.objetoAtual || '—')}</p>
+        <p><strong>Ação:</strong> ${escapar(d.acaoAtual || '—')}</p>
+        <p><strong>Dificuldade:</strong> ${escapar(d.dificuldadeAtual || '—')}</p>
+        <p><strong>Função:</strong> ${escapar(d.funcaoAtual || '—')}</p>
+      </div>
+      <div class="coord-bloco">
+        <h4>Avaliação / sugestão docente</h4>
+        <p><strong>Objeto:</strong> ${escapar(d.avaliacaoObjeto || '—')}
+          ${d.objetoSugerido ? ' → ' + escapar(d.objetoSugerido) : ''}</p>
+        <p><strong>Ação:</strong> ${escapar(d.avaliacaoAcao || '—')}
+          ${d.acaoSugerida ? ' → ' + escapar(d.acaoSugerida) : ''}</p>
+        <p><strong>Dificuldade:</strong> ${escapar(d.avaliacaoDificuldade || '—')}
+          ${d.dificuldadeSugerida ? ' → ' + escapar(d.dificuldadeSugerida) : ''}</p>
+        <p><strong>Função:</strong> ${escapar(d.avaliacaoFuncao || '—')}
+          ${d.funcaoSugerida ? ' → ' + escapar(d.funcaoSugerida) : ''}</p>
+      </div>
+    </div>
+
+    <div class="coord-observacao"><strong>Parecer geral</strong><br>${escapar(d.parecerGeral || '—')}</div>
+    <div class="coord-observacao"><strong>Observação docente</strong><br>${escapar(d.observacaoDocente || '—')}</div>
+
+    ${d.trecho ? `<div class="coord-observacao"><strong>Trecho da questão</strong><br>${escapar(d.trecho)}</div>` : ''}
+
+    ${d.pdfDisponivel && d.urlPdf
+      ? `<a class="link-pdf" href="${atributo(d.urlPdf)}" target="_blank">
+           Abrir PDF de origem — página ${escapar(d.pagina || '')}
+         </a>`
+      : ''}
+  `;
+
+  const select = document.getElementById('coord-decisao');
+  select.innerHTML = '<option value="">Selecione</option>';
+
+  (d.decisoes || estado.coordenacao.decisoes || []).forEach(decisao => {
+    const opt = document.createElement('option');
+    opt.value = decisao;
+    opt.textContent = decisao;
+    select.appendChild(opt);
+  });
+
+  if (d.decisaoAtual) select.value = d.decisaoAtual;
+
+  document.getElementById('coord-form-decisao')
+    .classList.toggle('oculto', Boolean(resolvido));
+
+  document.getElementById('coord-justificativa').value = '';
+}
+
+function coordResumoItemWebV160(rotulo, valor) {
+  return `
+    <div class="coord-resumo-item">
+      <span>${escapar(rotulo)}</span>
+      <strong>${escapar(valor || '—')}</strong>
+    </div>
+  `;
+}
+
+function fecharModalCoordenacaoWebV160() {
+  document.getElementById('modal-coordenacao').close();
+}
+
+function salvarDecisaoCoordenacaoInterfaceWebV160(event) {
+  event.preventDefault();
+
+  const form = Object.fromEntries(new FormData(event.currentTarget).entries());
+
+  if (!form.decisao) {
+    mostrarMensagem('Selecione uma decisão.', true);
+    return;
+  }
+
+  if (String(form.justificativa || '').trim().length < 10) {
+    mostrarMensagem('A justificativa precisa ter pelo menos 10 caracteres.', true);
+    return;
+  }
+
+  if (!window.confirm('Aplicar a decisão "' + form.decisao + '" a este caso?')) {
+    return;
+  }
+
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      mostrarCarregando(false);
+      fecharModalCoordenacaoWebV160();
+      mostrarMensagem(resposta.mensagem || 'Decisão aplicada.');
+      forcarReloadViewWebV190('coordenacao');
+      forcarReloadViewWebV190('editoracao');
+      carregarPainelCoordenacaoWebV160();
+    })
+    .withFailureHandler(tratarErro)
+    .salvarDecisaoCoordenacaoWebV160(form);
+}
+
+function carregarPermissoesWebV150() {
+  google.script.run
+    .withSuccessHandler(contexto => {
+      estado.permissoes = contexto.permissoes || {};
+      aplicarPermissoesInterfaceWebV150(contexto);
+    })
+    .withFailureHandler(tratarErro)
+    .obterPermissoesUsuarioWebV150();
+}
+
+function aplicarPermissoesInterfaceWebV150(contexto) {
+  const p = contexto.permissoes || {};
+  const usuario = contexto.usuario || {};
+
+  const navUsuarios = document.getElementById('nav-usuarios');
+  const navCoordenacao = document.getElementById('nav-coordenacao');
+  const navEditoracao = document.getElementById('nav-editoracao');
+  const navCadastro = document.getElementById('nav-cadastro');
+
+  navUsuarios.classList.toggle('oculto', !p.usuarios);
+  navCoordenacao.classList.toggle('oculto', !p.coordenacao);
+  navEditoracao.classList.toggle('oculto', !p.editoracao);
+  navCadastro.classList.toggle('oculto', !p.cadastrar);
+
+  if (usuario.perfil) {
+    const atual = document.getElementById('usuario-disciplina');
+    if (atual && !atual.textContent.includes(usuario.perfil)) {
+      atual.dataset.perfil = usuario.perfil;
+    }
+  }
+}
+
+function carregarUsuariosWebV150() {
+  if (!estado.permissoes || !estado.permissoes.usuarios) return;
+
+  const corpo = document.getElementById('lista-usuarios');
+  corpo.innerHTML =
+    '<tr><td colspan="7">Carregando usuários...</td></tr>';
+
+  google.script.run
+    .withSuccessHandler(usuarios => {
+      estado.usuarios = usuarios || [];
+      renderizarUsuariosWebV150();
+    })
+    .withFailureHandler(tratarErro)
+    .listarUsuariosWebV150();
+}
+
+function renderizarUsuariosWebV150() {
+  const corpo = document.getElementById('lista-usuarios');
+  corpo.innerHTML = '';
+
+  if (!estado.usuarios.length) {
+    corpo.innerHTML =
+      '<tr><td colspan="7">Nenhum usuário cadastrado.</td></tr>';
+    return;
+  }
+
+  estado.usuarios.forEach(u => {
+    const tr = document.createElement('tr');
+
+    tr.innerHTML = `
+      <td><strong>${escapar(u.nome || '')}</strong></td>
+      <td>${escapar(u.email || '')}</td>
+      <td><span class="perfil-badge">${escapar(u.perfil || '')}</span></td>
+      <td>${escapar(u.area || '—')}</td>
+      <td>${escapar(u.disciplinas || '—')}</td>
+      <td><span class="status-usuario">${escapar(u.ativo || '')}</span></td>
+      <td class="acoes-usuario"></td>
+    `;
+
+    const acoes = tr.querySelector('.acoes-usuario');
+
+    const editar = document.createElement('button');
+    editar.type = 'button';
+    editar.className = 'btn btn-secundario';
+    editar.textContent = 'Editar';
+    editar.addEventListener('click', () => abrirEditarUsuarioWebV150(u));
+
+    const status = document.createElement('button');
+    status.type = 'button';
+    status.className = 'btn btn-secundario';
+    const estaAtivo =
+      String(u.ativo || '').trim().toUpperCase() !== 'NÃO';
+    status.textContent = estaAtivo ? 'Desativar' : 'Ativar';
+    status.addEventListener('click', () =>
+      alterarStatusUsuarioInterfaceWebV150(
+        u.email,
+        estaAtivo ? 'NÃO' : 'SIM'
+      )
+    );
+
+    acoes.append(editar, status);
+    corpo.appendChild(tr);
+  });
+}
+
+function abrirNovoUsuarioWebV150() {
+  const form = document.getElementById('form-usuario');
+  form.reset();
+  document.getElementById('usr-email').readOnly = false;
+  document.getElementById('usr-ativo').value = 'SIM';
+  document.getElementById('titulo-modal-usuario').textContent =
+    'Novo usuário';
+  document.getElementById('modal-usuario').showModal();
+}
+
+function abrirEditarUsuarioWebV150(usuario) {
+  document.getElementById('titulo-modal-usuario').textContent =
+    'Editar usuário';
+
+  document.getElementById('usr-nome').value = usuario.nome || '';
+  document.getElementById('usr-email').value = usuario.email || '';
+  document.getElementById('usr-email').readOnly = true;
+  document.getElementById('usr-perfil').value =
+    usuario.perfil || 'Professor';
+  document.getElementById('usr-area').value = usuario.area || '';
+  document.getElementById('usr-disciplinas').value =
+    usuario.disciplinas || '';
+  document.getElementById('usr-ativo').value =
+    String(usuario.ativo || '').trim().toUpperCase() === 'NÃO'
+      ? 'NÃO'
+      : 'SIM';
+
+  document.getElementById('modal-usuario').showModal();
+}
+
+function salvarUsuarioWebV150(event) {
+  event.preventDefault();
+
+  const form = Object.fromEntries(
+    new FormData(event.currentTarget).entries()
+  );
+
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      mostrarCarregando(false);
+      document.getElementById('modal-usuario').close();
+      mostrarMensagem(resposta.mensagem);
+      carregarUsuariosWebV150();
+    })
+    .withFailureHandler(tratarErro)
+    .salvarUsuarioWebV150(form);
+}
+
+function alterarStatusUsuarioInterfaceWebV150(email, ativo) {
+  const acao = ativo === 'SIM' ? 'ativar' : 'desativar';
+
+  if (!window.confirm('Deseja ' + acao + ' este usuário?')) return;
+
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      mostrarCarregando(false);
+      mostrarMensagem(resposta.mensagem);
+      carregarUsuariosWebV150();
+    })
+    .withFailureHandler(tratarErro)
+    .alterarStatusUsuarioWebV150(email, ativo);
+}
+
+
+function abrirSalvarSequencia() {
+  if (!estado.sequencia || !estado.sequencia.itens.length) {
+    mostrarMensagem('A sequência atual está vazia.', true);
+    return;
+  }
+
+  document.getElementById('form-salvar-sequencia').reset();
+  document.getElementById('modal-salvar-sequencia').showModal();
+}
+
+function salvarSequenciaAtualWeb(event) {
+  event.preventDefault();
+
+  const meta = Object.fromEntries(
+    new FormData(event.currentTarget).entries()
+  );
+
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      mostrarCarregando(false);
+      document.getElementById('modal-salvar-sequencia').close();
+      mostrarMensagem(
+        resposta.mensagem +
+        ' ID: ' +
+        resposta.idSequencia
+      );
+      carregarMinhasSequencias();
+    })
+    .withFailureHandler(tratarErro)
+    .salvarSequenciaWebV130(meta);
+}
+
+function limparSequenciaAtualWeb() {
+  if (!estado.sequencia || !estado.sequencia.itens.length) {
+    mostrarMensagem('A sequência atual já está vazia.');
+    return;
+  }
+
+  const confirmar = window.confirm(
+    'Limpar sua sequência atual? ' +
+    'As sequências já salvas não serão excluídas.'
+  );
+
+  if (!confirmar) return;
+
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      estado.sequencia = resposta.sequencia;
+      renderizarSequencia(resposta.sequencia);
+      mostrarCarregando(false);
+      mostrarMensagem(resposta.mensagem);
+    })
+    .withFailureHandler(tratarErro)
+    .limparSequenciaWebV130();
+}
+
+function carregarMinhasSequencias() {
+  google.script.run
+    .withSuccessHandler(renderizarMinhasSequencias)
+    .withFailureHandler(tratarErro)
+    .listarMinhasSequenciasWebV130();
+}
+
+function renderizarMinhasSequencias(lista) {
+  const container = document.getElementById(
+    'lista-minhas-sequencias'
+  );
+
+  if (!lista || !lista.length) {
+    container.className = 'lista-vazia';
+    container.textContent = 'Você ainda não salvou nenhuma sequência.';
+    return;
+  }
+
+  container.className = '';
+  container.innerHTML = lista.map(item => `
+    <article class="sequencia-salva">
+      <div>
+        <h3>${escapar(item.titulo || 'Sem título')}</h3>
+        <p>
+          ${escapar(item.disciplinas || item.area || '')}
+          · ${Number(item.quantidade || 0)} questões
+          · ${Number(item.tempo || 0)} min
+        </p>
+        <small>
+          ${escapar(item.criadaEm || '')}
+          · v${escapar(item.versao || '1')}
+          · ${escapar(item.status || '')}
+        </small>
+      </div>
+      <div class="sequencia-salva-acoes">
+        <button class="btn btn-secundario"
+          data-carregar-sequencia="${atributo(item.id)}">
+          Carregar
+        </button>
+        ${estado.permissoes && estado.permissoes.editoracao
+          ? `<button class="btn btn-principal"
+               data-enviar-editoracao="${atributo(item.id)}">
+               Enviar à editoração
+             </button>`
+          : ''}
+        <button class="btn btn-perigo"
+          data-excluir-sequencia="${atributo(item.id)}"
+          data-titulo-sequencia="${atributo(item.titulo || 'Sem título')}">
+          Excluir
+        </button>
+      </div>
+    </article>
+  `).join('');
+}
+
+document.addEventListener('click', evento => {
+  const excluir = evento.target.closest('[data-excluir-sequencia]');
+
+  if (excluir) {
+    excluirMinhaSequenciaWebV192(
+      excluir.dataset.excluirSequencia,
+      excluir.dataset.tituloSequencia
+    );
+    return;
+  }
+
+  const enviar = evento.target.closest('[data-enviar-editoracao]');
+
+  if (enviar) {
+    enviarSequenciaEditoracaoWebV170(
+      enviar.dataset.enviarEditoracao
+    );
+    return;
+  }
+
+  const abrirProjeto = evento.target.closest('[data-ed-projeto]');
+
+  if (abrirProjeto) {
+    abrirProjetoEditoracaoWebV170(
+      abrirProjeto.dataset.edProjeto
+    );
+    return;
+  }
+
+  const editarRecorte = evento.target.closest('[data-ed-recorte]');
+
+  if (editarRecorte) {
+    abrirMetadadosRecorteWebV170(
+      editarRecorte.dataset.edRecorte
+    );
+    return;
+  }
+
+  const botao = evento.target.closest('[data-carregar-sequencia]');
+
+  if (!botao) return;
+
+  const id = botao.dataset.carregarSequencia;
+
+  const confirmar = window.confirm(
+    'Carregar esta sequência? ' +
+    'Sua sequência atual será substituída.'
+  );
+
+  if (!confirmar) return;
+
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      estado.sequencia = resposta.sequencia;
+      renderizarSequencia(resposta.sequencia);
+      mostrarCarregando(false);
+      mostrarMensagem(resposta.mensagem);
+      navegar('sequencia');
+    })
+    .withFailureHandler(tratarErro)
+    .carregarMinhaSequenciaWebV130(id);
+});
+
+
+
+
+function excluirMinhaSequenciaWebV192(
+  idSequencia,
+  titulo
+) {
+  const nome = titulo || 'Sem título';
+
+  const confirmar = window.confirm(
+    'Excluir a sequência "' + nome + '"?\n\n' +
+    'A sequência salva e seus itens serão removidos. ' +
+    'Esta ação não poderá ser desfeita.\n\n' +
+    'Se ela já possuir projeto editorial, a exclusão será bloqueada.'
+  );
+
+  if (!confirmar) return;
+
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      mostrarCarregando(false);
+
+      renderizarMinhasSequencias(
+        resposta.sequencias || []
+      );
+
+      if (
+        estado.performance &&
+        estado.performance.carregamentos
+      ) {
+        estado.performance.carregamentos.sequencias = Date.now();
+      }
+
+      mostrarMensagem(
+        resposta.mensagem ||
+        'Sequência excluída.'
+      );
+    })
+    .withFailureHandler(tratarErro)
+    .excluirMinhaSequenciaWebV192(
+      idSequencia
+    );
+}
+
+
+function enviarSequenciaEditoracaoWebV170(idSequencia) {
+  if (!window.confirm(
+    'Enviar esta sequência para a Editoração?'
+  )) return;
+
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      mostrarCarregando(false);
+      mostrarMensagem(resposta.mensagem);
+      forcarReloadViewWebV190('editoracao');
+      navegar('editoracao');
+    })
+    .withFailureHandler(tratarErro)
+    .criarProjetoEditorialWebV170(idSequencia);
+}
+
+
+function carregarProjetosEditoracaoWebV170() {
+  if (!estado.permissoes || !estado.permissoes.editoracao) return;
+
+  const container = document.getElementById('ed-lista-projetos');
+  container.className = 'lista-vazia';
+  container.textContent = 'Carregando projetos...';
+
+  google.script.run
+    .withSuccessHandler(lista => {
+      estado.editoracao.projetos = lista || [];
+      renderizarProjetosEditoracaoWebV170();
+    })
+    .withFailureHandler(tratarErro)
+    .listarProjetosEditoracaoWebV170();
+}
+
+
+function renderizarProjetosEditoracaoWebV170() {
+  const lista = estado.editoracao.projetos || [];
+  const container = document.getElementById('ed-lista-projetos');
+
+  const totalItens = lista.reduce(
+    (s, p) => s + Number(p.quantidade || 0),
+    0
+  );
+
+  const totalRecortes = lista.reduce(
+    (s, p) => s + Number(p.recortesPreparados || 0),
+    0
+  );
+
+  const totalGabaritos = lista.reduce(
+    (s, p) => s + Number(p.gabaritosPreparados || 0),
+    0
+  );
+
+  document.getElementById('ed-kpi-projetos').textContent = lista.length;
+  document.getElementById('ed-kpi-itens').textContent = totalItens;
+  document.getElementById('ed-kpi-recortes').textContent = totalRecortes;
+  document.getElementById('ed-kpi-gabaritos').textContent = totalGabaritos;
+
+  if (!lista.length) {
+    container.className = 'lista-vazia';
+    container.textContent =
+      'Nenhum projeto editorial. Envie uma sequência salva para começar.';
+    return;
+  }
+
+  container.className = '';
+  container.innerHTML = lista.map(p => `
+    <article class="ed-projeto">
+      <div>
+        <h3>${escapar(p.titulo || p.id)}</h3>
+        <p>
+          ${Number(p.quantidade || 0)} questões
+          · ${escapar(p.status || '')}
+        </p>
+        <div class="ed-progresso">
+          <span class="ed-chip">
+            Recortes ${Number(p.recortesPreparados || 0)}/${Number(p.quantidade || 0)}
+          </span>
+          <span class="ed-chip">
+            Gabaritos ${Number(p.gabaritosPreparados || 0)}/${Number(p.quantidade || 0)}
+          </span>
+        </div>
+        <small>${escapar(p.criadoEm || '')}</small>
+      </div>
+      <button
+        class="btn btn-secundario"
+        data-ed-projeto="${atributo(p.id)}"
+      >
+        Abrir projeto
+      </button>
+    </article>
+  `).join('');
+}
+
+
+function abrirProjetoEditoracaoWebV170(idProjeto) {
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(dados => {
+      mostrarCarregando(false);
+      estado.editoracao.projetoAtual = dados;
+      renderizarProjetoEditoracaoWebV170(dados);
+      document.getElementById('modal-editoracao').showModal();
+    })
+    .withFailureHandler(tratarErro)
+    .obterProjetoEditoracaoWebV170(idProjeto);
+}
+
+
+function renderizarProjetoEditoracaoWebV170(dados) {
+  document.getElementById('ed-modal-titulo').textContent =
+    dados.projeto.titulo || dados.projeto.id;
+
+  const r = dados.resumo;
+
+  document.getElementById('ed-resumo-projeto').innerHTML = `
+    ${edResumoCardV170('Questões', r.total)}
+    ${edResumoCardV170('Fontes localizadas', r.fontesOk + '/' + r.total)}
+    ${edResumoCardV170('Gabaritos', r.gabaritosOk + '/' + r.total)}
+    ${edResumoCardV170('Recortes validados', r.recortesOk + '/' + r.total)}
+  `;
+
+  document.getElementById('ed-itens-projeto').innerHTML =
+    dados.itens.map(item => `
+      <article class="ed-item">
+        <div class="ed-item-ordem">${Number(item.ordem || 0)}</div>
+        <div>
+          <h4>${escapar(item.id)}</h4>
+          <p>${escapar(item.componente || item.area || '')}
+            · ${escapar(item.competencia || '')}
+            · ${escapar(item.habilidade || '')}
+          </p>
+          <p>${escapar(item.objeto || '')}</p>
+          <div class="ed-item-tags">
+            <span class="ed-chip ${item.fonteDisponivel ? 'ed-status-ok' : 'ed-status-pendente'}">
+              PDF ${item.fonteDisponivel ? '✓' : 'pendente'}
+            </span>
+            <span class="ed-chip ${item.gabarito ? 'ed-status-ok' : 'ed-status-pendente'}">
+              Gabarito ${item.gabarito ? escapar(item.gabarito) : 'pendente'}
+            </span>
+            <span class="ed-chip ${item.statusRecorte === 'Validado' ? 'ed-status-ok' : 'ed-status-pendente'}">
+              Recorte ${escapar(item.statusRecorte || 'Não preparado')}
+            </span>
+            <span class="ed-chip">${escapar(item.liberacao || '')}</span>
+          </div>
+        </div>
+        <button
+          class="btn btn-secundario"
+          data-ed-recorte="${atributo(item.id)}"
+        >
+          Metadados
+        </button>
+      </article>
+    `).join('');
+}
+
+
+function edResumoCardV170(rotulo, valor) {
+  return `
+    <div class="ed-resumo-card">
+      <span>${escapar(rotulo)}</span>
+      <strong>${escapar(valor)}</strong>
+    </div>
+  `;
+}
+
+
+function abrirMetadadosRecorteWebV170(id) {
+  const dados = estado.editoracao.projetoAtual;
+  if (!dados) return;
+
+  const item = dados.itens.find(x => x.id === id);
+  if (!item) return;
+
+  document.getElementById('ed-recorte-id').textContent = id;
+  document.getElementById('ed-rec-id').value = id;
+  document.getElementById('ed-rec-gabarito').value = item.gabarito || '';
+  document.getElementById('ed-rec-x').value = item.cropX ?? '';
+  document.getElementById('ed-rec-y').value = item.cropY ?? '';
+  document.getElementById('ed-rec-w').value = item.cropW ?? '';
+  document.getElementById('ed-rec-h').value = item.cropH ?? '';
+
+  document.getElementById('modal-metadados-recorte').showModal();
+}
+
+
+function salvarMetadadosRecorteInterfaceV170(event) {
+  event.preventDefault();
+
+  const form = Object.fromEntries(
+    new FormData(event.currentTarget).entries()
+  );
+
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      mostrarCarregando(false);
+      document.getElementById('modal-metadados-recorte').close();
+      mostrarMensagem(resposta.mensagem);
+
+      const atual = estado.editoracao.projetoAtual;
+      if (atual) {
+        abrirProjetoEditoracaoWebV170(atual.projeto.id);
+      }
+    })
+    .withFailureHandler(tratarErro)
+    .salvarMetadadosRecorteWebV170(form);
+}
+
+
+function gerarPacoteEditoracaoInterfaceV170() {
+  const atual = estado.editoracao.projetoAtual;
+  if (!atual) return;
+
+  if (!window.confirm(
+    'Gerar o pacote técnico para recorte e montagem dos dois cadernos?'
+  )) return;
+
+  mostrarCarregando(true);
+
+  google.script.run
+    .withSuccessHandler(resposta => {
+      mostrarCarregando(false);
+
+      mostrarMensagem(
+        resposta.mensagem +
+        ' ' + resposta.quantidade + ' questão(ões). ' +
+        resposta.recortesPendentes + ' recorte(s) serão preparados no RStudio.'
+      );
+
+      if (resposta.url) {
+        window.open(resposta.url, '_blank');
+      }
+    })
+    .withFailureHandler(tratarErro)
+    .gerarPacoteTecnicoEditoracaoWebV170(atual.projeto.id);
+}
+
+
+function tratarErro(erro) {
+  mostrarCarregando(false);
+  mostrarMensagem(
+    erro && erro.message ? erro.message : String(erro),
+    true
+  );
+}
+
+function valor(id) {
+  return document.getElementById(id).value;
+}
+
+function formatarNumero(numero) {
+  return new Intl.NumberFormat('pt-BR').format(Number(numero) || 0);
+}
+
+function escapar(valor) {
+  return String(valor ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function atributo(valor) {
+  return escapar(valor);
+}
+</script>

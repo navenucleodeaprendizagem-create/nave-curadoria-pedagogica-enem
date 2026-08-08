@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body{
+      font-family:Arial,sans-serif;
+      margin:0;
+      padding:18px;
+      background:#f8fafc;
+      color:#1f2937
+    }
+    h2{
+      margin:0 0 14px;
+      color:#0f766e
+    }
+    .card{
+      background:#fff;
+      border:1px solid #dbe4e8;
+      border-radius:10px;
+      padding:14px;
+      margin-bottom:14px
+    }
+    .meta{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+      font-size:12px
+    }
+    .meta div{
+      background:#f1f5f9;
+      padding:8px;
+      border-radius:6px
+    }
+    label{
+      display:block;
+      margin:12px 0 5px;
+      font-weight:bold;
+      font-size:13px
+    }
+    textarea{
+      width:100%;
+      box-sizing:border-box;
+      min-height:170px;
+      padding:10px;
+      border:1px solid #cbd5e1;
+      border-radius:6px;
+      resize:vertical
+    }
+    #justificativa{
+      min-height:90px
+    }
+    button{
+      width:100%;
+      margin-top:16px;
+      padding:11px;
+      background:#0f766e;
+      color:#fff;
+      border:0;
+      border-radius:7px;
+      font-weight:bold;
+      cursor:pointer
+    }
+    button:disabled{
+      opacity:.6;
+      cursor:wait
+    }
+    .alerta{
+      background:#fef3c7;
+      padding:10px;
+      border-radius:6px;
+      margin-top:10px;
+      display:none
+    }
+    .status{
+      margin-top:12px;
+      padding:10px;
+      border-radius:6px;
+      display:none
+    }
+    .ok{background:#d1fae5}
+    .erro{background:#fecaca}
+  </style>
+</head>
+<body>
+  <h2>Corrigir trecho</h2>
+
+  <div class="card">
+    <div class="meta">
+      <div>
+        <strong>ID</strong><br>
+        <span id="id"></span>
+      </div>
+      <div>
+        <strong>Habilidade</strong><br>
+        <span id="habilidade"></span>
+      </div>
+      <div>
+        <strong>Ano/Edição</strong><br>
+        <span id="edicao"></span>
+      </div>
+      <div>
+        <strong>Página</strong><br>
+        <span id="pagina"></span>
+      </div>
+    </div>
+
+    <div id="alerta" class="alerta"></div>
+  </div>
+
+  <form id="form">
+    <input
+      type="hidden"
+      name="idQuestao"
+      value="<?= idQuestao ?>"
+    >
+
+    <label for="novoTrecho">
+      Trecho corrigido
+    </label>
+    <textarea
+      id="novoTrecho"
+      name="novoTrecho"
+      required
+    ></textarea>
+
+    <label for="justificativa">
+      Justificativa da alteração
+    </label>
+    <textarea
+      id="justificativa"
+      name="justificativa"
+      required
+    ></textarea>
+
+    <button
+      id="salvar"
+      type="submit"
+    >
+      Salvar correção
+    </button>
+  </form>
+
+  <div id="status" class="status"></div>
+
+  <script>
+    const idQuestao = '<?= idQuestao ?>';
+
+    function mostrarStatus(texto, classe){
+      const el = document.getElementById('status');
+      el.textContent = texto;
+      el.className = 'status ' + classe;
+      el.style.display = 'block';
+    }
+
+    google.script.run
+      .withSuccessHandler(d => {
+        document.getElementById('id').textContent =
+          d.id || '';
+        document.getElementById('habilidade').textContent =
+          d.habilidade || '';
+        document.getElementById('edicao').textContent =
+          `${d.ano || ''} / ${d.edicao || ''}`;
+        document.getElementById('pagina').textContent =
+          d.pagina || '';
+        document.getElementById('novoTrecho').value =
+          d.trecho || '';
+
+        if(d.alerta){
+          const alerta = document.getElementById('alerta');
+          alerta.textContent =
+            `Alerta atual: ${d.alerta}`;
+          alerta.style.display = 'block';
+        }
+      })
+      .withFailureHandler(
+        e => mostrarStatus(e.message, 'erro')
+      )
+      .obterDadosQuestaoCompletaV04(idQuestao);
+
+    document.getElementById('form')
+      .addEventListener('submit', event => {
+        event.preventDefault();
+
+        const botao = document.getElementById('salvar');
+        botao.disabled = true;
+        botao.textContent = 'Salvando...';
+
+        const form =
+          Object.fromEntries(
+            new FormData(event.target).entries()
+          );
+
+        google.script.run
+          .withSuccessHandler(res => {
+            const complemento = res.alertaRestante
+              ? ` Alerta restante: ${res.alertaRestante}`
+              : ' O alerta técnico foi resolvido.';
+
+            mostrarStatus(
+              res.mensagem + complemento,
+              'ok'
+            );
+
+            botao.textContent = 'Correção salva';
+
+            setTimeout(
+              () => google.script.host.close(),
+              1600
+            );
+          })
+          .withFailureHandler(e => {
+            mostrarStatus(e.message, 'erro');
+            botao.disabled = false;
+            botao.textContent = 'Salvar correção';
+          })
+          .salvarCorrecaoTrechoV04(form);
+      });
+  </script>
+</body>
+</html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body{
+      font-family:Arial,sans-serif;
+      margin:0;
+      padding:18px;
+      background:#f8fafc;
+      color:#1f2937
+    }
+    h2{margin:0 0 14px;color:#0f766e}
+    .card{
+      background:#fff;
+      border:1px solid #dbe4e8;
+      border-radius:10px;
+      padding:14px;
+      margin-bottom:14px
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px
+    }
+    .item{
+      background:#f1f5f9;
+      padding:8px;
+      border-radius:6px;
+      font-size:12px
+    }
+    .label{
+      display:block;
+      margin-top:12px;
+      margin-bottom:5px;
+      font-weight:bold;
+      color:#475569;
+      font-size:13px
+    }
+    .trecho{
+      white-space:pre-wrap;
+      line-height:1.45;
+      font-size:13px;
+      max-height:190px;
+      overflow-y:auto
+    }
+    select,input,textarea{
+      width:100%;
+      box-sizing:border-box;
+      padding:9px;
+      border:1px solid #cbd5e1;
+      border-radius:6px;
+      background:#fff
+    }
+    textarea{min-height:90px;resize:vertical}
+    .sugestao{display:none;margin-top:8px}
+    button{
+      width:100%;
+      margin-top:16px;
+      padding:11px;
+      border:0;
+      border-radius:7px;
+      font-weight:bold;
+      cursor:pointer;
+      background:#0f766e;
+      color:#fff
+    }
+    button:disabled{opacity:.6;cursor:wait}
+    .status{
+      display:none;
+      margin-top:12px;
+      padding:10px;
+      border-radius:6px
+    }
+    .ok{background:#d1fae5}
+    .erro{background:#fecaca}
+    .aviso{
+      background:#fef3c7;
+      padding:9px;
+      border-radius:6px;
+      margin-top:10px;
+      font-size:12px
+    }
+  </style>
+</head>
+<body>
+  <h2>Validar questão</h2>
+
+  <div class="card">
+    <div class="grid">
+      <div class="item"><strong>ID</strong><br><span id="id"></span></div>
+      <div class="item"><strong>Ano/Edição</strong><br><span id="edicao"></span></div>
+      <div class="item"><strong>Competência/Habilidade</strong><br><span id="habilidade"></span></div>
+      <div class="item"><strong>Status da validação</strong><br><span id="statusValidacao"></span></div>
+      <div class="item"><strong>Dificuldade</strong><br><span id="dificuldade"></span></div>
+      <div class="item"><strong>Função pedagógica</strong><br><span id="funcao"></span></div>
+    </div>
+
+    <span class="label">Objeto atual</span>
+    <div id="objeto"></div>
+
+    <span class="label">Ação cognitiva atual</span>
+    <div id="acaoAtual"></div>
+
+    <span class="label">Trecho inicial</span>
+    <div class="trecho" id="trecho"></div>
+  </div>
+
+  <form id="form">
+    <input type="hidden" name="idQuestao" value="<?= idQuestao ?>">
+
+    <label class="label" for="avaliacaoObjeto">Objeto de conhecimento</label>
+    <select id="avaliacaoObjeto" name="avaliacaoObjeto" required>
+      <option value="">Selecione</option>
+      <option>Correto</option>
+      <option>Incorreto</option>
+      <option>Não consigo avaliar</option>
+    </select>
+    <div id="boxObjeto" class="sugestao">
+      <input name="objetoSugerido" placeholder="Objeto sugerido">
+    </div>
+
+    <label class="label" for="avaliacaoAcao">Ação cognitiva</label>
+    <select id="avaliacaoAcao" name="avaliacaoAcao" required>
+      <option value="">Selecione</option>
+      <option>Correta</option>
+      <option>Incorreta</option>
+      <option>Não consigo avaliar</option>
+    </select>
+    <div id="boxAcao" class="sugestao">
+      <input name="acaoSugerida" placeholder="Ação cognitiva sugerida">
+    </div>
+
+    <label class="label" for="avaliacaoDificuldade">Dificuldade</label>
+    <select id="avaliacaoDificuldade" name="avaliacaoDificuldade" required>
+      <option value="">Selecione</option>
+      <option>Adequada</option>
+      <option>Superestimada</option>
+      <option>Subestimada</option>
+      <option>Não consigo avaliar</option>
+    </select>
+    <div id="boxDificuldade" class="sugestao">
+      <select name="dificuldadeSugerida">
+        <option value="">Dificuldade sugerida</option>
+        <option>Muito fácil</option>
+        <option>Fácil</option>
+        <option>Média</option>
+        <option>Difícil</option>
+        <option>Muito difícil</option>
+      </select>
+    </div>
+
+    <label class="label" for="avaliacaoFuncao">Função pedagógica</label>
+    <select id="avaliacaoFuncao" name="avaliacaoFuncao" required>
+      <option value="">Selecione</option>
+      <option>Adequada</option>
+      <option>Inadequada</option>
+      <option>Não consigo avaliar</option>
+    </select>
+    <div id="boxFuncao" class="sugestao">
+      <select name="funcaoSugerida">
+        <option value="">Função sugerida</option>
+        <option>Diagnóstico</option>
+        <option>Introdução / resolução guiada</option>
+        <option>Consolidação</option>
+        <option>Aplicação autônoma / transferência</option>
+        <option>Revisão</option>
+        <option>Avaliação</option>
+      </select>
+    </div>
+
+    <label class="label" for="avaliacaoTrecho">Qualidade do trecho</label>
+    <select id="avaliacaoTrecho" name="avaliacaoTrecho" required>
+      <option value="">Selecione</option>
+      <option>Adequado</option>
+      <option>Adequado com ressalva</option>
+      <option>Inadequado</option>
+    </select>
+
+    <label class="label" for="parecerGeral">Parecer geral</label>
+    <select id="parecerGeral" name="parecerGeral" required>
+      <option value="">Selecione</option>
+      <option>Validada</option>
+      <option>Validada com ressalva</option>
+      <option>Solicitar ajuste</option>
+      <option>Inadequada para uso</option>
+    </select>
+
+    <label class="label" for="observacao">Observação docente</label>
+    <textarea
+      id="observacao"
+      name="observacao"
+      placeholder="Registre a justificativa quando houver ressalva, divergência ou solicitação de ajuste."
+    ></textarea>
+
+    <div class="aviso">
+      Divergências não alteram automaticamente a classificação da questão.
+      Elas são encaminhadas à coordenação.
+    </div>
+
+    <button id="salvar" type="submit">Registrar validação</button>
+  </form>
+
+  <div id="status" class="status"></div>
+
+  <script>
+    const idQuestao = '<?= idQuestao ?>';
+
+    function mostrarStatus(texto, classe){
+      const el = document.getElementById('status');
+      el.textContent = texto;
+      el.className = 'status ' + classe;
+      el.style.display = 'block';
+    }
+
+    function alternar(idSelect, valor, idBox){
+      document.getElementById(idBox).style.display =
+        document.getElementById(idSelect).value === valor
+          ? 'block'
+          : 'none';
+    }
+
+    document.getElementById('avaliacaoObjeto').addEventListener(
+      'change',
+      () => alternar('avaliacaoObjeto', 'Incorreto', 'boxObjeto')
+    );
+
+    document.getElementById('avaliacaoAcao').addEventListener(
+      'change',
+      () => alternar('avaliacaoAcao', 'Incorreta', 'boxAcao')
+    );
+
+    document.getElementById('avaliacaoDificuldade').addEventListener(
+      'change',
+      () => {
+        const v = document.getElementById('avaliacaoDificuldade').value;
+        document.getElementById('boxDificuldade').style.display =
+          ['Superestimada', 'Subestimada'].includes(v)
+            ? 'block'
+            : 'none';
+      }
+    );
+
+    document.getElementById('avaliacaoFuncao').addEventListener(
+      'change',
+      () => alternar('avaliacaoFuncao', 'Inadequada', 'boxFuncao')
+    );
+
+    google.script.run
+      .withSuccessHandler(d => {
+        document.getElementById('id').textContent = d.id || '';
+        document.getElementById('edicao').textContent =
+          `${d.ano || ''} / ${d.edicao || ''}`;
+        document.getElementById('habilidade').textContent =
+          `${d.competencia || ''} / ${d.habilidade || ''}`;
+        document.getElementById('statusValidacao').textContent =
+          d.statusValidacao || 'Não avaliada';
+        document.getElementById('dificuldade').textContent =
+          d.dificuldade || '';
+        document.getElementById('funcao').textContent =
+          d.funcao || '';
+        document.getElementById('objeto').textContent =
+          d.objeto || '';
+        document.getElementById('acaoAtual').textContent =
+          d.acaoCognitiva || 'Não informada';
+        document.getElementById('trecho').textContent =
+          d.trecho || 'Trecho não disponível.';
+      })
+      .withFailureHandler(e => mostrarStatus(e.message, 'erro'))
+      .obterDadosValidacaoV05(idQuestao);
+
+    document.getElementById('form').addEventListener('submit', event => {
+      event.preventDefault();
+
+      const botao = document.getElementById('salvar');
+      botao.disabled = true;
+      botao.textContent = 'Registrando...';
+
+      const form = Object.fromEntries(new FormData(event.target).entries());
+
+      google.script.run
+        .withSuccessHandler(r => {
+          mostrarStatus(r.mensagem, 'ok');
+          botao.textContent = 'Validação registrada';
+          setTimeout(() => google.script.host.close(), 1500);
+        })
+        .withFailureHandler(e => {
+          mostrarStatus(e.message, 'erro');
+          botao.disabled = false;
+          botao.textContent = 'Registrar validação';
+        })
+        .salvarValidacaoDocenteV05(form);
+    });
+  </script>
+</body>
+</html>

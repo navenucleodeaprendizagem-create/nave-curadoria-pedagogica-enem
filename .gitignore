@@ -1,0 +1,13 @@
+.clasp.json
+
+# Arquivos temporários / sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporários de editores
+*.tmp
+*.bak
+~$*

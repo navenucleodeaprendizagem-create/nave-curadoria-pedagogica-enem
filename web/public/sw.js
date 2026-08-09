@@ -23,7 +23,12 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
+
+if (url.origin !== self.location.origin) return;
+
+// O health check precisa sempre consultar a rede real.
+// Se ele cair no cache, o sistema pode parecer online sem internet.
+if (url.pathname.startsWith("/api/health")) return;
 
   if (request.mode === "navigate") {
     event.respondWith(

@@ -1,0 +1,23 @@
+# ==========================================================
+# NAVE — arquivos que NÃO pertencem ao Google Apps Script
+# ==========================================================
+
+web/**
+rstudio/**
+docs/**
+
+.git/**
+.github/**
+
+node_modules/**
+**/node_modules/**
+
+README.md
+WORKFLOW.md
+AGENTS.md
+CLAUDE.md
+
+# Arquivos locais de configuração
+.clasp.json
+.gitignore
+.claspignore

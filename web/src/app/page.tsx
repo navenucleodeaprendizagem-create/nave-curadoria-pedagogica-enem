@@ -1,4 +1,5 @@
 import ConnectivityStatus from "@/components/ConnectivityStatus";
+import LocalDatabaseStatus from "@/components/LocalDatabaseStatus";
 
 export default function Home() {
   return (
@@ -9,7 +10,10 @@ export default function Home() {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-700">NAVE</p>
             <h1 className="mt-1 text-xl font-bold">Sistema de Inteligência e Gestão da Aprendizagem</h1>
           </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
           <ConnectivityStatus />
+          <LocalDatabaseStatus />
+        </div>
         </header>
 
         <section className="flex flex-1 items-center py-16">

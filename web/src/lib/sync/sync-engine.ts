@@ -1,6 +1,7 @@
 import {
   getPendingSyncOperations,
   updateSyncOperation,
+  type NaveSyncOperation,
 } from "@/lib/db/nave-db";
 
 export interface SyncResult {
@@ -21,12 +22,21 @@ export async function runSync(): Promise<SyncResult> {
     };
   }
 
-  for (const operation of pending) {
+  const operationsToSend: NaveSyncOperation[] =
+    pending.map((operation) => ({
+      ...operation,
+      status: "processing",
+      attempts: operation.attempts + 1,
+      updatedAt: new Date().toISOString(),
+      lastError: undefined,
+    }));
+
+  for (const operation of operationsToSend) {
     await updateSyncOperation(
       operation.id,
       {
         status: "processing",
-        attempts: operation.attempts + 1,
+        attempts: operation.attempts,
         lastError: undefined,
       }
     );
@@ -34,15 +44,16 @@ export async function runSync(): Promise<SyncResult> {
 
   try {
     const response = await fetch(
-      "/api/sync-test",
+      "/api/sync",
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type":
+            "application/json",
         },
         cache: "no-store",
         body: JSON.stringify({
-          operations: pending,
+          operations: operationsToSend,
         }),
       }
     );
@@ -55,6 +66,13 @@ export async function runSync(): Promise<SyncResult> {
 
     const result = await response.json();
 
+    if (!result?.ok) {
+      throw new Error(
+        result?.error ||
+          "Backend não confirmou a sincronização."
+      );
+    }
+
     const processedIds = new Set<string>(
       Array.isArray(result.processedIds)
         ? result.processedIds
@@ -64,7 +82,7 @@ export async function runSync(): Promise<SyncResult> {
     let completed = 0;
     let failed = 0;
 
-    for (const operation of pending) {
+    for (const operation of operationsToSend) {
       if (processedIds.has(operation.id)) {
         await updateSyncOperation(
           operation.id,
@@ -90,7 +108,7 @@ export async function runSync(): Promise<SyncResult> {
     }
 
     return {
-      sent: pending.length,
+      sent: operationsToSend.length,
       completed,
       failed,
     };
@@ -100,7 +118,7 @@ export async function runSync(): Promise<SyncResult> {
         ? error.message
         : "Falha desconhecida";
 
-    for (const operation of pending) {
+    for (const operation of operationsToSend) {
       await updateSyncOperation(
         operation.id,
         {
@@ -111,9 +129,9 @@ export async function runSync(): Promise<SyncResult> {
     }
 
     return {
-      sent: pending.length,
+      sent: operationsToSend.length,
       completed: 0,
-      failed: pending.length,
+      failed: operationsToSend.length,
     };
   }
 }

@@ -1,5 +1,6 @@
 import ConnectivityStatus from "@/components/ConnectivityStatus";
 import LocalDatabaseStatus from "@/components/LocalDatabaseStatus";
+import LocalQuestionsTest from "@/components/LocalQuestionsTest";
 
 export default function Home() {
   return (
@@ -37,6 +38,10 @@ export default function Home() {
               ))}
             </div>
           </div>
+        </section>
+
+        <section className="pb-10">
+        <LocalQuestionsTest />
         </section>
 
         <footer className="border-t border-slate-200 pt-6 text-sm text-slate-500">

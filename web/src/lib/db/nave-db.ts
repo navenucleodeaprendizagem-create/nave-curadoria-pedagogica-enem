@@ -207,3 +207,88 @@ export async function initializeNaveDb(): Promise<void> {
     true
   );
 }
+
+export interface NaveQuestionRecord {
+  id: string;
+  area: string;
+  disciplina: string;
+  competencia: string;
+  habilidade: string;
+  objeto: string;
+  dificuldade: string;
+  gabarito: string;
+  updatedAt: string;
+}
+
+export async function putQuestion(
+  question: NaveQuestionRecord
+): Promise<void> {
+  const db = await openNaveDb();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(
+      STORES.QUESTIONS,
+      "readwrite"
+    );
+
+    const store = transaction.objectStore(
+      STORES.QUESTIONS
+    );
+
+    store.put(question);
+
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+
+    transaction.onerror = () => {
+      db.close();
+
+      reject(
+        transaction.error ??
+          new Error(
+            "Falha ao salvar questão local."
+          )
+      );
+    };
+  });
+}
+
+export async function getAllQuestions(): Promise<
+  NaveQuestionRecord[]
+> {
+  const db = await openNaveDb();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(
+      STORES.QUESTIONS,
+      "readonly"
+    );
+
+    const store = transaction.objectStore(
+      STORES.QUESTIONS
+    );
+
+    const request = store.getAll();
+
+    request.onsuccess = () => {
+      const result =
+        request.result as NaveQuestionRecord[];
+
+      db.close();
+      resolve(result);
+    };
+
+    request.onerror = () => {
+      db.close();
+
+      reject(
+        request.error ??
+          new Error(
+            "Falha ao ler questões locais."
+          )
+      );
+    };
+  });
+}

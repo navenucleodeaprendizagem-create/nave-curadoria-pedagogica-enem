@@ -1,21 +1,15 @@
+import ConnectivityStatus from "@/components/ConnectivityStatus";
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#f5f7f6] text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-6 py-8 lg:px-10">
-        <header className="flex items-center justify-between border-b border-slate-200 pb-6">
+        <header className="flex flex-col gap-5 border-b border-slate-200 pb-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-700">
-              NAVE
-            </p>
-
-            <h1 className="mt-1 text-xl font-bold">
-              Sistema de Inteligência e Gestão da Aprendizagem
-            </h1>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-teal-700">NAVE</p>
+            <h1 className="mt-1 text-xl font-bold">Sistema de Inteligência e Gestão da Aprendizagem</h1>
           </div>
-
-          <span className="rounded-full bg-white px-4 py-2 text-sm text-slate-600 shadow-sm">
-            Ambiente em desenvolvimento
-          </span>
+          <ConnectivityStatus />
         </header>
 
         <section className="flex flex-1 items-center py-16">
@@ -23,32 +17,20 @@ export default function Home() {
             <p className="mb-5 text-sm font-bold uppercase tracking-[0.16em] text-teal-700">
               Curadoria Pedagógica ENEM
             </p>
-
             <h2 className="max-w-4xl text-4xl font-bold leading-tight tracking-tight md:text-6xl">
               Direção pedagógica, dados e governança em um único sistema.
             </h2>
-
             <p className="mt-7 max-w-3xl text-lg leading-8 text-slate-600">
-              Ambiente para busca e seleção de questões, construção de sequências
-              pedagógicas, validação docente, coordenação e fluxo editorial.
+              Ambiente para busca e seleção de questões, construção de sequências pedagógicas,
+              validação docente, coordenação e fluxo editorial.
             </p>
 
             <div className="mt-10 flex flex-wrap gap-3">
-              <span className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">
-                Banco de questões
-              </span>
-
-              <span className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">
-                Sequências pedagógicas
-              </span>
-
-              <span className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">
-                Validação e governança
-              </span>
-
-              <span className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">
-                Editoração
-              </span>
+              {["Banco de questões", "Sequências pedagógicas", "Validação e governança", "Editoração"].map((item) => (
+                <span key={item} className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">
+                  {item}
+                </span>
+              ))}
             </div>
           </div>
         </section>

@@ -3,27 +3,46 @@
 import { useEffect, useState } from "react";
 import {
   enqueueSyncOperation,
+  getAllSyncOperations,
   getPendingSyncOperations,
 } from "@/lib/db/nave-db";
 
+import { runSync } from "@/lib/sync/sync-engine";
+
 export default function SyncQueueTest() {
   const [pending, setPending] = useState<number | null>(null);
+  const [completed, setCompleted] = useState<number | null>(null);
+
   const [status, setStatus] = useState(
     "Consultando fila de sincronização"
   );
 
+  const [syncing, setSyncing] = useState(false);
+
   async function refreshQueue() {
     try {
-      const operations =
+      const pendingOperations =
         await getPendingSyncOperations();
 
-      setPending(operations.length);
+      const allOperations =
+        await getAllSyncOperations();
 
-      setStatus(
-        operations.length === 0
-          ? "Nenhuma operação pendente"
-          : `${operations.length} operação(ões) aguardando sincronização`
-      );
+      const completedOperations =
+        allOperations.filter(
+          (operation) =>
+            operation.status === "completed"
+        );
+
+      setPending(pendingOperations.length);
+      setCompleted(completedOperations.length);
+
+      if (pendingOperations.length === 0) {
+        setStatus("Nenhuma operação pendente");
+      } else {
+        setStatus(
+          `${pendingOperations.length} operação(ões) aguardando sincronização`
+        );
+      }
     } catch (error) {
       console.error(
         "NAVE: falha ao consultar fila.",
@@ -54,7 +73,7 @@ export default function SyncQueueTest() {
           statusValidacao:
             "Validada por docente",
           observacao:
-            "Operação criada no teste offline-first V0.4",
+            "Operação criada no teste offline-first V0.5",
         },
       });
 
@@ -68,6 +87,48 @@ export default function SyncQueueTest() {
       setStatus(
         "Falha ao registrar operação"
       );
+    }
+  }
+
+  async function synchronizeNow() {
+    if (syncing) return;
+
+    try {
+      setSyncing(true);
+      setStatus("Sincronizando");
+
+      const result = await runSync();
+
+      if (
+        result.sent === 0
+      ) {
+        setStatus(
+          "Nenhuma operação para sincronizar"
+        );
+      } else if (
+        result.failed === 0
+      ) {
+        setStatus(
+          `${result.completed} operação(ões) sincronizada(s) com sucesso`
+        );
+      } else {
+        setStatus(
+          `${result.completed} concluída(s) · ${result.failed} com erro`
+        );
+      }
+
+      await refreshQueue();
+    } catch (error) {
+      console.error(
+        "NAVE: falha na sincronização.",
+        error
+      );
+
+      setStatus(
+        "Falha ao executar sincronização"
+      );
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -92,8 +153,25 @@ export default function SyncQueueTest() {
           Criar operação pendente
         </button>
 
+        <button
+          type="button"
+          disabled={syncing}
+          onClick={() =>
+            void synchronizeNow()
+          }
+          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {syncing
+            ? "Sincronizando..."
+            : "Sincronizar agora"}
+        </button>
+
         <span className="text-sm text-slate-600">
           Pendentes: {pending ?? "—"}
+        </span>
+
+        <span className="text-sm text-slate-600">
+          Concluídas: {completed ?? "—"}
         </span>
       </div>
     </div>

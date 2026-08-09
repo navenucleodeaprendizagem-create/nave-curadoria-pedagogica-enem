@@ -2,6 +2,7 @@ import ConnectivityStatus from "@/components/ConnectivityStatus";
 import LocalDatabaseStatus from "@/components/LocalDatabaseStatus";
 import LocalQuestionsTest from "@/components/LocalQuestionsTest";
 import SyncQueueTest from "@/components/SyncQueueTest";
+import AuthStatus from "@/components/AuthStatus";
 
 export default function Home() {
   return (
@@ -15,6 +16,7 @@ export default function Home() {
           <div className="flex flex-col gap-3 sm:flex-row">
           <ConnectivityStatus />
           <LocalDatabaseStatus />
+          <AuthStatus />
         </div>
         </header>
 

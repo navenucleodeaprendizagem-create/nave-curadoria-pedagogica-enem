@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import AutoSyncManager from "@/components/AutoSyncManager";
+import AuthProvider from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
   title: "NAVE | Sistema de Inteligência e Gestão da Aprendizagem",
@@ -17,9 +19,12 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body>
-        <ServiceWorkerRegister />
-        <AutoSyncManager />
-        {children}
+        <AuthProvider>
+          <ServiceWorkerRegister />
+          <AutoSyncManager />
+
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

@@ -1,6 +1,7 @@
 import ConnectivityStatus from "@/components/ConnectivityStatus";
 import LocalDatabaseStatus from "@/components/LocalDatabaseStatus";
 import LocalQuestionsTest from "@/components/LocalQuestionsTest";
+import SyncQueueTest from "@/components/SyncQueueTest";
 
 export default function Home() {
   return (
@@ -40,9 +41,10 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="pb-10">
+      <section className="space-y-4 pb-10">
         <LocalQuestionsTest />
-        </section>
+        <SyncQueueTest />
+      </section>
 
         <footer className="border-t border-slate-200 pt-6 text-sm text-slate-500">
           NAVE — Núcleo de Aprendizagem, Valor e Estratégia

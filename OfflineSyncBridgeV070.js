@@ -202,6 +202,7 @@ function registrarOperacoesOfflineSyncV070_(
   }
 
   const agora = new Date();
+  const ss = sheet.getParent();
 
   const linhas = [];
   const processedIds = [];
@@ -226,6 +227,25 @@ function registrarOperacoesOfflineSyncV070_(
       processedIds.push(id);
       return;
     }
+
+    /*
+ * V0.8:
+ * operações de validação são encaminhadas também
+ * para a zona segura VALIDACOES_OFFLINE_ENTRADA.
+ *
+ * A gravação em SYNC_OFFLINE_TESTE continua existindo
+ * como trilha técnica geral da sincronização.
+ */
+    const entidade = String(
+        operation.entity || ''
+    ).trim().toLowerCase();
+
+    if (entidade === 'validation') {
+        registrarValidacaoOfflineV080_(
+            ss,
+            operation
+        );
+}
 
     linhas.push([
       id,

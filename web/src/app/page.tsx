@@ -3,6 +3,7 @@ import LocalDatabaseStatus from "@/components/LocalDatabaseStatus";
 import LocalQuestionsTest from "@/components/LocalQuestionsTest";
 import SyncQueueTest from "@/components/SyncQueueTest";
 import AuthStatus from "@/components/AuthStatus";
+import NaveAccessGate from "@/components/NaveAccessGate";
 
 export default function Home() {
   return (
@@ -33,13 +34,9 @@ export default function Home() {
               validação docente, coordenação e fluxo editorial.
             </p>
 
-            <div className="mt-10 flex flex-wrap gap-3">
-              {["Banco de questões", "Sequências pedagógicas", "Validação e governança", "Editoração"].map((item) => (
-                <span key={item} className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">
-                  {item}
-                </span>
-              ))}
-            </div>
+            <div className="mt-10">
+  <NaveAccessGate />
+</div>
           </div>
         </section>
 

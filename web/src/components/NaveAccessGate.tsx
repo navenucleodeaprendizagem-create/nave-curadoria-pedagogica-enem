@@ -158,45 +158,60 @@ export default function NaveAccessGate() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        {permissions.buscar && (
-          <Link
-            href="/banco-questoes"
-            className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm transition hover:border-slate-300 hover:shadow"
-          >
-            Banco de questões
-          </Link>
-    )}
+  {permissions.buscar && (
+    <Link
+      href="/banco-questoes"
+      className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm transition hover:border-slate-300 hover:shadow"
+    >
+      Banco de questões
+    </Link>
+  )}
 
-        {permissions.sequencias && (
-          <span className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">
-            Sequências pedagógicas
-          </span>
-        )}
+  {permissions.sequencias && (
+    <Link
+      href="/sequencias"
+      className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm transition hover:border-slate-300 hover:shadow"
+    >
+      Sequências pedagógicas
+    </Link>
+  )}
 
-        {permissions.validar && (
-          <span className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">
-            Validação
-          </span>
-        )}
+  {permissions.validar && (
+    <Link
+      href="/validacao"
+      className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm transition hover:border-slate-300 hover:shadow"
+    >
+      Validação
+    </Link>
+  )}
 
-        {permissions.coordenacao && (
-          <span className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">
-            Coordenação
-          </span>
-        )}
+  {permissions.coordenacao && (
+    <Link
+      href="/coordenacao"
+      className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm transition hover:border-slate-300 hover:shadow"
+    >
+      Coordenação
+    </Link>
+  )}
 
-        {permissions.editoracao && (
-          <span className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">
-            Editoração
-          </span>
-        )}
+  {permissions.editoracao && (
+    <Link
+      href="/editoracao"
+      className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm transition hover:border-slate-300 hover:shadow"
+    >
+      Editoração
+    </Link>
+  )}
 
-        {permissions.usuarios && (
-          <span className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">
-            Usuários
-          </span>
-        )}
-      </div>
+  {permissions.usuarios && (
+    <Link
+      href="/usuarios"
+      className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm transition hover:border-slate-300 hover:shadow"
+    >
+      Usuários
+    </Link>
+  )}
+</div>
     </div>
   );
 }

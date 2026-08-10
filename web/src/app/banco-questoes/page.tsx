@@ -1,57 +1,44 @@
 import Link from "next/link";
 
+import QuestionBankSearchV01131 from "@/components/QuestionBankSearchV01131";
+
 import {
   requireNavePermission,
 } from "@/lib/auth/require-nave-permission";
 
 export default async function BancoQuestoesPage() {
-  const {
-    user,
-  } =
+  const { user } =
     await requireNavePermission(
       "buscar"
     );
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-12 text-slate-900">
+    <main className="min-h-screen bg-slate-50 px-6 py-8">
       <div className="mx-auto max-w-6xl">
         <Link
           href="/"
-          className="text-sm font-semibold text-teal-700"
+          className="text-sm font-semibold text-teal-700 hover:underline"
         >
           ← Voltar ao início
         </Link>
 
-        <div className="mt-10">
-          <p className="text-sm font-bold uppercase tracking-[0.16em] text-teal-700">
-            Curadoria Pedagógica ENEM
+        <div className="mt-6">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-teal-700">
+            Sistema NAVE
           </p>
 
-          <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-5xl">
+          <h1 className="mt-2 text-3xl font-bold text-slate-950">
             Banco de questões
           </h1>
 
-          <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600">
-            Área protegida do Sistema NAVE para busca, análise e seleção de questões.
+          <p className="mt-2 text-sm text-slate-500">
+            Usuário: {user.nome} · Perfil:{" "}
+            {user.perfil}
           </p>
         </div>
 
-        <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="text-sm text-slate-500">
-            Usuário autorizado
-          </div>
-
-          <div className="mt-1 font-semibold">
-            {user.nome}
-          </div>
-
-          <div className="text-sm text-slate-600">
-            {user.perfil}
-          </div>
-
-          <div className="mt-6 text-sm text-slate-500">
-            Estrutura inicial da V0.10.1. O mecanismo real de busca será migrado nas próximas etapas.
-          </div>
+        <div className="mt-8">
+          <QuestionBankSearchV01131 />
         </div>
       </div>
     </main>

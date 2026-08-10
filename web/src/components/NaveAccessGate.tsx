@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 
 type NavePermissions = {
   buscar: boolean;
@@ -158,10 +159,13 @@ export default function NaveAccessGate() {
 
       <div className="flex flex-wrap gap-3">
         {permissions.buscar && (
-          <span className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">
+          <Link
+            href="/banco-questoes"
+            className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm transition hover:border-slate-300 hover:shadow"
+          >
             Banco de questões
-          </span>
-        )}
+          </Link>
+    )}
 
         {permissions.sequencias && (
           <span className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm">

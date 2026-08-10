@@ -179,6 +179,56 @@ function doPost(e) {
       });
     }
 
+        /* =====================================================
+       V0.11.1 — INFORMAÇÕES DO BANCO DE QUESTÕES
+    ===================================================== */
+
+    if (
+      action ===
+      'getQuestionBankInfo'
+    ) {
+      const ss =
+        obterSpreadsheetOfflineSyncV070_();
+
+      const info =
+        obterInfoBancoQuestoesOfflineV0111_(
+          ss
+        );
+
+      return respostaJsonOfflineSyncV070_({
+        ok: true,
+        action:
+          'getQuestionBankInfo',
+        bank: info
+      });
+    }
+
+
+    /* =====================================================
+       V0.11.1 — BLOCO DO BANCO DE QUESTÕES
+    ===================================================== */
+
+    if (
+      action ===
+      'getQuestionBankChunk'
+    ) {
+      const ss =
+        obterSpreadsheetOfflineSyncV070_();
+
+      const chunk =
+        obterChunkBancoQuestoesOfflineV0111_(
+          ss,
+          body.offset,
+          body.limit
+        );
+
+      return respostaJsonOfflineSyncV070_({
+        ok: true,
+        action:
+          'getQuestionBankChunk',
+        chunk: chunk
+      });
+    }
 
     /* =====================================================
        AÇÃO DESCONHECIDA

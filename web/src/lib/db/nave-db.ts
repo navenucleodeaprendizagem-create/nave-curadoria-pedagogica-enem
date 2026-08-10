@@ -210,19 +210,42 @@ export async function initializeNaveDb(): Promise<void> {
 
 export interface NaveQuestionRecord {
   id: string;
-  area: string;
-  disciplina: string;
+
+  componentePrincipal: string;
+
   competencia: string;
   habilidade: string;
-  objeto: string;
-  dificuldade: string;
-  gabarito: string;
-  updatedAt: string;
+  objetoPrincipal: string;
+
+  dificuldadeRotulo: string;
+  dificuldadeFaixa: number;
+
+  ano: string;
+  edicao: string;
+
+  funcaoPedagogica: string;
+  tempoEstimadoMin: number;
+
+  trechoInicial: string;
+
+  statusItem: string;
+  statusCuradoria: string;
+  statusValidacao: string;
+  maturidadeCuradoria: string;
+
+  quantidadeReportes: number;
+  possuiReporteAberto: boolean;
+
+  syncedAt: string;
 }
 
-export async function putQuestion(
-  question: NaveQuestionRecord
+export async function putQuestions(
+  questions: NaveQuestionRecord[]
 ): Promise<void> {
+  if (questions.length === 0) {
+    return;
+  }
+
   const db = await openNaveDb();
 
   return new Promise((resolve, reject) => {
@@ -235,7 +258,9 @@ export async function putQuestion(
       STORES.QUESTIONS
     );
 
-    store.put(question);
+    for (const question of questions) {
+      store.put(question);
+    }
 
     transaction.oncomplete = () => {
       db.close();
@@ -248,7 +273,7 @@ export async function putQuestion(
       reject(
         transaction.error ??
           new Error(
-            "Falha ao salvar questão local."
+            "Falha ao salvar questões locais em lote."
           )
       );
     };
@@ -287,6 +312,41 @@ export async function getAllQuestions(): Promise<
         request.error ??
           new Error(
             "Falha ao ler questões locais."
+          )
+      );
+    };
+  });
+}
+
+export async function countQuestions(): Promise<number> {
+  const db = await openNaveDb();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(
+      STORES.QUESTIONS,
+      "readonly"
+    );
+
+    const store = transaction.objectStore(
+      STORES.QUESTIONS
+    );
+
+    const request = store.count();
+
+    request.onsuccess = () => {
+      const count = request.result;
+
+      db.close();
+      resolve(count);
+    };
+
+    request.onerror = () => {
+      db.close();
+
+      reject(
+        request.error ??
+          new Error(
+            "Falha ao contar questões locais."
           )
       );
     };

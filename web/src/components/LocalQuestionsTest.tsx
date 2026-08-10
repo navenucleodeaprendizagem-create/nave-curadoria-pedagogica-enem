@@ -1,103 +1,236 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import {
-  getAllQuestions,
-  putQuestion,
-  type NaveQuestionRecord,
+  countQuestions,
+  getMeta,
 } from "@/lib/db/nave-db";
 
-const TEST_QUESTIONS: NaveQuestionRecord[] = [
-  {
-    id: "TEST_Q001",
-    area: "CN",
-    disciplina: "Química",
-    competencia: "C1",
-    habilidade: "H1",
-    objeto: "Transformações químicas",
-    dificuldade: "Média",
-    gabarito: "B",
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "TEST_Q002",
-    area: "CN",
-    disciplina: "Física",
-    competencia: "C2",
-    habilidade: "H6",
-    objeto: "Energia",
-    dificuldade: "Média",
-    gabarito: "C",
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: "TEST_Q003",
-    area: "CN",
-    disciplina: "Biologia",
-    competencia: "C4",
-    habilidade: "H14",
-    objeto: "Ecologia",
-    dificuldade: "Difícil",
-    gabarito: "A",
-    updatedAt: new Date().toISOString(),
-  },
-];
+import {
+  syncQuestionBank,
+  type QuestionBankSyncProgress,
+} from "@/lib/questions/question-bank-sync";
+
+type LocalBankStatus = {
+  count: number;
+  status: string;
+  version: string;
+  syncedAt: string;
+};
 
 export default function LocalQuestionsTest() {
-  const [count, setCount] = useState<number | null>(
-    null
-  );
+  const [bank, setBank] =
+    useState<LocalBankStatus | null>(null);
 
-  const [status, setStatus] =
-    useState("Lendo questões locais");
+  const [loading, setLoading] =
+    useState(true);
 
-  async function refreshCount() {
-    const questions = await getAllQuestions();
-    setCount(questions.length);
+  const [syncing, setSyncing] =
+    useState(false);
 
-    setStatus(
-      questions.length === 0
-        ? "Nenhuma questão local"
-        : `${questions.length} questão(ões) armazenada(s)`
-    );
+  const [progress, setProgress] =
+    useState<QuestionBankSyncProgress | null>(null);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
+  async function loadStatus() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const [
+        count,
+        statusMeta,
+        versionMeta,
+        syncedAtMeta,
+      ] = await Promise.all([
+        countQuestions(),
+        getMeta("question_bank_status"),
+        getMeta("question_bank_version"),
+        getMeta("question_bank_synced_at"),
+      ]);
+
+      setBank({
+        count,
+
+        status:
+          typeof statusMeta?.value === "string"
+            ? statusMeta.value
+            : "não sincronizado",
+
+        version:
+          typeof versionMeta?.value === "string"
+            ? versionMeta.value
+            : "—",
+
+        syncedAt:
+          typeof syncedAtMeta?.value === "string"
+            ? syncedAtMeta.value
+            : "",
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Falha ao consultar banco local."
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
-    void refreshCount();
+    void loadStatus();
   }, []);
 
-  async function seedQuestions() {
-    setStatus("Salvando questões de teste");
-
-    for (const question of TEST_QUESTIONS) {
-      await putQuestion(question);
+  function formatDate(value: string) {
+    if (!value) {
+      return "—";
     }
 
-    await refreshCount();
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return date.toLocaleString("pt-BR");
+  }
+
+  async function handleSync() {
+    try {
+      setSyncing(true);
+      setError("");
+      setMessage("");
+      setProgress({
+        current: 0,
+        total: 0,
+      });
+
+      const result =
+        await syncQuestionBank(
+          (nextProgress) => {
+            setProgress(nextProgress);
+          }
+        );
+
+      setMessage(
+        `Sincronização concluída: ${result.downloaded} registros recebidos; ${result.local} registros locais.`
+      );
+
+      await loadStatus();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Falha ao sincronizar banco de questões."
+      );
+    } finally {
+      setSyncing(false);
+    }
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-sm font-semibold text-slate-800">
-        Teste do banco de questões local
-      </p>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div>
+        <p className="text-sm font-semibold text-teal-700">
+          Banco de questões local
+        </p>
 
-      <p className="mt-1 text-sm text-slate-500">
-        {status}
-      </p>
+        <p className="mt-1 text-sm text-slate-500">
+          Cópia operacional do Banco NAVE armazenada neste navegador.
+        </p>
+      </div>
 
-      <div className="mt-4 flex items-center gap-3">
+      {loading ? (
+        <p className="mt-4 text-sm text-slate-600">
+          Consultando IndexedDB...
+        </p>
+      ) : (
+        <div className="mt-4 grid gap-2 text-sm text-slate-700">
+          <p>
+            <strong>Questões locais:</strong>{" "}
+            {bank?.count ?? 0}
+          </p>
+
+          <p>
+            <strong>Status:</strong>{" "}
+            {bank?.status ?? "—"}
+          </p>
+
+          <p>
+            <strong>Versão:</strong>{" "}
+            {bank?.version ?? "—"}
+          </p>
+
+          <p>
+            <strong>Última sincronização:</strong>{" "}
+            {formatDate(
+              bank?.syncedAt ?? ""
+            )}
+          </p>
+        </div>
+      )}
+
+      {syncing && progress ? (
+        <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
+          <p className="font-semibold">
+            Sincronizando banco...
+          </p>
+
+          <p className="mt-1">
+            {progress.current} /{" "}
+            {progress.total || "—"}
+          </p>
+
+          {progress.total > 0 ? (
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full bg-teal-700 transition-all"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.round(
+                      (progress.current /
+                        progress.total) *
+                        100
+                    )
+                  )}%`,
+                }}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {message ? (
+        <p className="mt-4 text-sm text-emerald-700">
+          {message}
+        </p>
+      ) : null}
+
+      {error ? (
+        <p className="mt-4 text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="mt-5">
         <button
           type="button"
-          onClick={() => void seedQuestions()}
-          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white"
+          onClick={() => void handleSync()}
+          disabled={syncing}
+          className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Gravar 3 questões de teste
+          {syncing
+            ? "Sincronizando..."
+            : "Sincronizar banco"}
         </button>
-
-        <span className="text-sm text-slate-600">
-          Total local: {count ?? "—"}
-        </span>
       </div>
     </div>
   );

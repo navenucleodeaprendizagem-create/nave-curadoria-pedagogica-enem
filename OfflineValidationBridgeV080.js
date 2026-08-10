@@ -1,17 +1,23 @@
 /**
- * NAVE | OFFLINE VALIDATION BRIDGE — V0.8.0
+ * NAVE | OFFLINE VALIDATION BRIDGE — V0.8.3
  *
  * Zona segura de entrada das validações docentes
  * recebidas pela arquitetura offline-first.
  *
  * IMPORTANTE:
+ *
  * - NÃO possui doPost().
  * - NÃO altera QUESTOES_GERAL.
  * - NÃO altera a estrutura produtiva de validações.
  * - Apenas registra entradas em VALIDACOES_OFFLINE_ENTRADA.
+ *
+ * V0.8.3:
+ * - passa a exigir identidade autenticada pelo servidor Next.js/Auth.js;
+ * - não confia em usuário/e-mail informado pelo navegador;
+ * - preserva compatibilidade com as linhas históricas da V0.8.0.
  */
 
-const NAVE_OFFLINE_VALIDATION_V080 = Object.freeze({
+const NAVE_OFFLINE_VALIDATION_V083 = Object.freeze({
   ABA_ENTRADA: 'VALIDACOES_OFFLINE_ENTRADA',
 
   CABECALHOS: Object.freeze([
@@ -27,14 +33,19 @@ const NAVE_OFFLINE_VALIDATION_V080 = Object.freeze({
     'status_processamento',
     'processado_em',
     'erro_processamento',
-    'payload_json'
+    'payload_json',
+
+    // V0.8.3 — adicionados ao final para não deslocar dados antigos
+    'email_autenticado',
+    'id_usuario_google',
+    'nome_autenticado'
   ])
 });
 
 
 /* =========================================================
    ENTRADA DA VALIDAÇÃO
-   ========================================================= */
+========================================================= */
 
 function registrarValidacaoOfflineV080_(
   ss,
@@ -92,11 +103,64 @@ function registrarValidacaoOfflineV080_(
     );
   }
 
-  const usuario = String(
-    payload.usuario ||
-    payload.emailUsuario ||
-    ''
+  /* =======================================================
+     IDENTIDADE AUTENTICADA
+     =======================================================
+
+     Esta identidade foi acrescentada pela rota /api/sync
+     no servidor Next.js após validação da sessão Auth.js.
+
+     Não usamos mais:
+     - payload.usuario
+     - payload.emailUsuario
+     - qualquer identidade arbitrária enviada pelo navegador.
+  ======================================================= */
+
+  const authenticatedUser =
+    payload.authenticatedUser &&
+    typeof payload.authenticatedUser === 'object'
+      ? payload.authenticatedUser
+      : null;
+
+  if (!authenticatedUser) {
+    throw new Error(
+      'Validação offline sem identidade autenticada.'
+    );
+  }
+
+  const idUsuarioGoogle = String(
+    authenticatedUser.id || ''
   ).trim();
+
+  const emailAutenticado = String(
+    authenticatedUser.email || ''
+  )
+    .trim()
+    .toLowerCase();
+
+  const nomeAutenticado = String(
+    authenticatedUser.name || ''
+  ).trim();
+
+  if (!idUsuarioGoogle) {
+    throw new Error(
+      'Validação offline sem id do usuário autenticado.'
+    );
+  }
+
+  if (!emailAutenticado) {
+    throw new Error(
+      'Validação offline sem e-mail autenticado.'
+    );
+  }
+
+  /*
+   * Mantemos a coluna histórica "usuario".
+   * A partir da V0.8.3 ela recebe o e-mail autenticado,
+   * preservando compatibilidade com consultas existentes.
+   */
+  const usuario =
+    emailAutenticado;
 
   const statusValidacao = String(
     payload.statusValidacao ||
@@ -142,7 +206,12 @@ function registrarValidacaoOfflineV080_(
     'Recebida',
     '',
     '',
-    JSON.stringify(payload)
+    JSON.stringify(payload),
+
+    // V0.8.3
+    emailAutenticado,
+    idUsuarioGoogle,
+    nomeAutenticado
   ]];
 
   sheet
@@ -150,7 +219,7 @@ function registrarValidacaoOfflineV080_(
       sheet.getLastRow() + 1,
       1,
       1,
-      NAVE_OFFLINE_VALIDATION_V080
+      NAVE_OFFLINE_VALIDATION_V083
         .CABECALHOS.length
     )
     .setValues(linha);
@@ -165,40 +234,63 @@ function registrarValidacaoOfflineV080_(
 
 /* =========================================================
    ABA DE ENTRADA
-   ========================================================= */
+========================================================= */
 
 function garantirAbaValidacoesOfflineV080_(
   ss
 ) {
   let sheet =
     ss.getSheetByName(
-      NAVE_OFFLINE_VALIDATION_V080
+      NAVE_OFFLINE_VALIDATION_V083
         .ABA_ENTRADA
     );
 
   if (!sheet) {
     sheet = ss.insertSheet(
-      NAVE_OFFLINE_VALIDATION_V080
+      NAVE_OFFLINE_VALIDATION_V083
         .ABA_ENTRADA
     );
   }
 
   const headers =
-    NAVE_OFFLINE_VALIDATION_V080
+    NAVE_OFFLINE_VALIDATION_V083
       .CABECALHOS;
 
-  if (sheet.getLastRow() === 0) {
-    sheet
-      .getRange(
-        1,
-        1,
-        1,
-        headers.length
-      )
-      .setValues([headers]);
+  /*
+   * Compatibilidade V0.8.0 → V0.8.3
+   *
+   * A planilha antiga possuía 13 colunas.
+   * As 3 novas colunas são acrescentadas ao final.
+   * Nenhuma coluna histórica é deslocada.
+   */
 
-    sheet.setFrozenRows(1);
+  const colunasNecessarias =
+    headers.length;
+
+  const colunasAtuais =
+    sheet.getMaxColumns();
+
+  if (
+    colunasAtuais <
+    colunasNecessarias
+  ) {
+    sheet.insertColumnsAfter(
+      colunasAtuais,
+      colunasNecessarias -
+        colunasAtuais
+    );
   }
+
+  sheet
+    .getRange(
+      1,
+      1,
+      1,
+      headers.length
+    )
+    .setValues([headers]);
+
+  sheet.setFrozenRows(1);
 
   return sheet;
 }
@@ -206,7 +298,7 @@ function garantirAbaValidacoesOfflineV080_(
 
 /* =========================================================
    IDEMPOTÊNCIA
-   ========================================================= */
+========================================================= */
 
 function existeValidacaoOfflineV080_(
   sheet,
@@ -238,7 +330,7 @@ function existeValidacaoOfflineV080_(
 
 /* =========================================================
    UTILITÁRIOS
-   ========================================================= */
+========================================================= */
 
 function normalizarDataOfflineV080_(
   valor
@@ -263,8 +355,8 @@ function normalizarDataOfflineV080_(
 
 
 /* =========================================================
-   TESTE MANUAL
-   ========================================================= */
+   TESTE MANUAL SEGURO
+========================================================= */
 
 function testarEstruturaValidacoesOfflineV080() {
   const ss =
@@ -284,7 +376,7 @@ function testarEstruturaValidacoesOfflineV080() {
     ok: true,
     aba: sheet.getName(),
     colunas:
-      NAVE_OFFLINE_VALIDATION_V080
+      NAVE_OFFLINE_VALIDATION_V083
         .CABECALHOS.length
   };
 }

@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  useState,
+} from "react";
+
+import {
   signIn,
   signOut,
   useSession,
@@ -12,7 +16,19 @@ export default function AuthStatus() {
     status,
   } = useSession();
 
-  if (status === "loading") {
+  const [
+    authAction,
+    setAuthAction,
+  ] =
+    useState<
+      "signin" |
+      "signout" |
+      null
+    >(null);
+
+  if (
+    status === "loading"
+  ) {
     return (
       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
         Verificando usuário
@@ -24,12 +40,32 @@ export default function AuthStatus() {
     return (
       <button
         type="button"
-        onClick={() =>
-          void signIn("google")
+        disabled={
+          authAction !== null
         }
-        className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm"
+        onClick={() => {
+          setAuthAction(
+            "signin"
+          );
+
+          void signIn(
+            "google",
+            {
+              redirectTo:
+                "/",
+            }
+          ).catch(() => {
+            setAuthAction(
+              null
+            );
+          });
+        }}
+        className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
       >
-        Entrar com Google
+        {authAction ===
+        "signin"
+          ? "Entrando..."
+          : "Entrar com Google"}
       </button>
     );
   }
@@ -49,12 +85,45 @@ export default function AuthStatus() {
 
       <button
         type="button"
-        onClick={() =>
-          void signOut()
+        disabled={
+          authAction !== null
         }
-        className="ml-2 text-xs font-semibold text-slate-500 hover:text-slate-900"
+        onClick={() => {
+          setAuthAction(
+            "signout"
+          );
+
+          /*
+           * Limpa o cache apenas de UX do NaveAccessGate
+           * antes de encerrar a sessão.
+           */
+          try {
+            window.sessionStorage.removeItem(
+              "nave-authorized-context-v01171"
+            );
+
+            window.sessionStorage.removeItem(
+              "nave-authorized-context-v01172"
+            );
+          } catch {
+            // Cache opcional.
+          }
+
+          void signOut({
+            redirectTo:
+              "/",
+          }).catch(() => {
+            setAuthAction(
+              null
+            );
+          });
+        }}
+        className="ml-2 text-xs font-semibold text-slate-500 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Sair
+        {authAction ===
+        "signout"
+          ? "Saindo..."
+          : "Sair"}
       </button>
     </div>
   );

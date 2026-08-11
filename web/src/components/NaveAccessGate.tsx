@@ -47,7 +47,7 @@ type CachedAuthorizedContext = {
 };
 
 const SESSION_CACHE_KEY =
-  "nave-authorized-context-v01171";
+  "nave-authorized-context-v01172";
 
 const SESSION_CACHE_TTL_MS =
   60_000;
@@ -346,7 +346,6 @@ export default function NaveAccessGate() {
     email,
     googleId,
     retryToken,
-    session?.user,
     status,
   ]);
 

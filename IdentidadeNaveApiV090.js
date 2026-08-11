@@ -1,14 +1,15 @@
 /**
- * NAVE | IDENTIDADE E AUTORIZAÇÃO — V0.9.0
+ * NAVE | IDENTIDADE E AUTORIZAÇÃO — V0.9.1
  *
- * Liga a identidade autenticada pelo Google/Auth.js
- * ao cadastro oficial da aba USUARIOS.
+ * V0.11.7.2 — endurecimento de identidade:
  *
- * IMPORTANTE:
- * - NÃO substitui o campo email existente.
- * - NÃO cria um segundo cadastro de usuários.
- * - NÃO altera sequências ou dados pedagógicos.
- * - Adiciona somente campos de vinculação de identidade.
+ * - email_autenticacao é a chave primária de autorização;
+ * - id_google é somente vínculo de consistência;
+ * - uma conta Google não cadastrada nunca pode ser localizada
+ *   apenas por um id_google residual;
+ * - conflito de e-mail ou Google ID falha fechado;
+ * - vínculo automático do Google ID só ocorre quando o e-mail
+ *   autenticado corresponde exatamente à linha autorizada.
  */
 
 const NAVE_IDENTIDADE_V090 = Object.freeze({
@@ -24,6 +25,18 @@ const NAVE_IDENTIDADE_V090 = Object.freeze({
     'Professor',
     'Coordenador',
     'Administrador'
+  ]),
+
+  CAMPOS_OBRIGATORIOS: Object.freeze([
+    'email',
+    'nome',
+    'perfil',
+    'area',
+    'disciplinas',
+    'ativo',
+    'email_autenticacao',
+    'id_google',
+    'ultimo_login_em'
   ])
 });
 
@@ -33,7 +46,8 @@ const NAVE_IDENTIDADE_V090 = Object.freeze({
 ========================================================= */
 
 function instalarIdentidadeNaveV090() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss =
+    SpreadsheetApp.getActiveSpreadsheet();
 
   if (!ss) {
     throw new Error(
@@ -41,9 +55,10 @@ function instalarIdentidadeNaveV090() {
     );
   }
 
-  const aba = ss.getSheetByName(
-    NAVE_IDENTIDADE_V090.ABA_USUARIOS
-  );
+  const aba =
+    ss.getSheetByName(
+      NAVE_IDENTIDADE_V090.ABA_USUARIOS
+    );
 
   if (!aba) {
     throw new Error(
@@ -51,13 +66,26 @@ function instalarIdentidadeNaveV090() {
     );
   }
 
-  garantirCamposIdentidadeNaveV090_(aba);
+  garantirCamposIdentidadeNaveV090_(
+    aba
+  );
+
+  const headers =
+    obterCabecalhosIdentidadeNaveV091_(
+      aba
+    );
+
+  validarCabecalhosIdentidadeNaveV091_(
+    headers
+  );
 
   return {
     ok: true,
     aba: aba.getName(),
     camposAdicionados:
-      NAVE_IDENTIDADE_V090.CAMPOS_IDENTIDADE.slice()
+      NAVE_IDENTIDADE_V090
+        .CAMPOS_IDENTIDADE
+        .slice()
   };
 }
 
@@ -72,126 +100,247 @@ function obterContextoUsuarioAutenticadoV090_(
   spreadsheet,
   persistirVinculo
 ) {
+  const devePersistir =
+    persistirVinculo !== false;
 
-const devePersistir =
-    persistirVinculo !== false; 
-  const emailAuth = String(
-    emailAutenticacao || ''
-  )
-    .trim()
-    .toLowerCase();
+  const emailAuth =
+    normalizarEmailIdentidadeNaveV091_(
+      emailAutenticacao
+    );
 
-  const googleId = String(
-    idGoogle || ''
-  ).trim();
+  const googleId =
+    String(
+      idGoogle || ''
+    ).trim();
 
-  if (!emailAuth || !googleId) {
+  if (
+    !emailAuth ||
+    !googleId
+  ) {
     return {
       authorized: false,
-      reason: 'INVALID_AUTH_IDENTITY'
+      reason:
+        'INVALID_AUTH_IDENTITY'
     };
   }
 
   const ss =
-  spreadsheet ||
-  SpreadsheetApp.getActiveSpreadsheet();
+    spreadsheet ||
+    SpreadsheetApp
+      .getActiveSpreadsheet();
 
-if (!ss) {
-  return {
-    authorized: false,
-    reason: 'SPREADSHEET_NOT_AVAILABLE'
-  };
-}
-
-  const aba = ss.getSheetByName(
-    NAVE_IDENTIDADE_V090.ABA_USUARIOS
-  );
-
-  if (!aba || aba.getLastRow() < 2) {
+  if (!ss) {
     return {
       authorized: false,
-      reason: 'USERS_NOT_CONFIGURED'
+      reason:
+        'SPREADSHEET_NOT_AVAILABLE'
     };
   }
 
-  garantirCamposIdentidadeNaveV090_(aba);
+  const aba =
+    ss.getSheetByName(
+      NAVE_IDENTIDADE_V090
+        .ABA_USUARIOS
+    );
+
+  if (
+    !aba ||
+    aba.getLastRow() < 2
+  ) {
+    return {
+      authorized: false,
+      reason:
+        'USERS_NOT_CONFIGURED'
+    };
+  }
+
+  garantirCamposIdentidadeNaveV090_(
+    aba
+  );
 
   const dados =
-    aba.getDataRange().getDisplayValues();
+    aba
+      .getDataRange()
+      .getDisplayValues();
+
+  const headers =
+    dados[0] || [];
+
+  const validacaoHeaders =
+    validarCabecalhosIdentidadeNaveV091_(
+      headers,
+      false
+    );
+
+  if (
+    validacaoHeaders.ok !== true
+  ) {
+    return {
+      authorized: false,
+      reason:
+        'USERS_SCHEMA_INVALID'
+    };
+  }
 
   const idx =
     indexarIdentidadeNaveV090_(
-      dados[0]
+      headers
     );
 
   /*
-   * Prioridade 1:
-   * ID Google já vinculado.
+   * V0.11.7.2 — REGRA CENTRAL DE SEGURANÇA
+   *
+   * A linha autorizada é encontrada EXCLUSIVAMENTE
+   * pelo email_autenticacao.
+   *
+   * id_google NÃO é usado para localizar um usuário.
+   * Ele serve apenas para confirmar que a conta Google
+   * continua sendo a mesma depois que o e-mail correto
+   * localizou a linha.
    */
-  let numeroLinha = 0;
-  let linha = null;
+  const correspondenciasEmail =
+    [];
+
+  const correspondenciasGoogle =
+    [];
 
   for (
     let i = 1;
     i < dados.length;
     i++
   ) {
-    const idCadastrado = String(
-      dados[i][idx.id_google] || ''
-    ).trim();
+    const row =
+      dados[i];
+
+    const emailCadastrado =
+      normalizarEmailIdentidadeNaveV091_(
+        row[
+          idx.email_autenticacao
+        ]
+      );
+
+    const idCadastrado =
+      String(
+        row[
+          idx.id_google
+        ] || ''
+      ).trim();
+
+    if (
+      emailCadastrado &&
+      emailCadastrado === emailAuth
+    ) {
+      correspondenciasEmail.push({
+        indiceDados: i,
+        numeroLinha: i + 1,
+        linha: row
+      });
+    }
 
     if (
       idCadastrado &&
       idCadastrado === googleId
     ) {
-      numeroLinha = i + 1;
-      linha = dados[i];
-      break;
+      correspondenciasGoogle.push({
+        indiceDados: i,
+        numeroLinha: i + 1,
+        linha: row
+      });
     }
   }
 
   /*
-   * Prioridade 2:
-   * e-mail de autenticação cadastrado.
+   * Conta Google sem email_autenticacao cadastrado:
+   * negação imediata.
+   *
+   * Mesmo que o Google ID apareça em uma linha antiga,
+   * não autorizamos por esse vínculo isolado.
    */
-  if (!linha) {
-    for (
-      let i = 1;
-      i < dados.length;
-      i++
-    ) {
-      const emailCadastrado =
-        String(
-          dados[i][
-            idx.email_autenticacao
-          ] || ''
-        )
-          .trim()
-          .toLowerCase();
-
-      if (
-        emailCadastrado &&
-        emailCadastrado === emailAuth
-      ) {
-        numeroLinha = i + 1;
-        linha = dados[i];
-        break;
-      }
-    }
-  }
-
-  if (!linha) {
+  if (
+    correspondenciasEmail.length === 0
+  ) {
     return {
       authorized: false,
-      reason: 'USER_NOT_FOUND'
+      reason:
+        'USER_NOT_FOUND'
     };
   }
 
-  const ativo = String(
-    linha[idx.ativo] || ''
-  )
-    .trim()
-    .toUpperCase();
+  /*
+   * O mesmo e-mail de autenticação em mais de uma linha
+   * é ambiguidade de identidade e deve falhar fechado.
+   */
+  if (
+    correspondenciasEmail.length > 1
+  ) {
+    return {
+      authorized: false,
+      reason:
+        'DUPLICATE_AUTH_EMAIL'
+    };
+  }
+
+  const selecionado =
+    correspondenciasEmail[0];
+
+  const numeroLinha =
+    selecionado.numeroLinha;
+
+  const linha =
+    selecionado.linha;
+
+  const idCadastradoNaLinha =
+    String(
+      linha[
+        idx.id_google
+      ] || ''
+    ).trim();
+
+  /*
+   * Se o Google ID atual já estiver vinculado a OUTRA
+   * linha, há conflito de identidade.
+   */
+  const conflitoGoogle =
+    correspondenciasGoogle
+      .some(function(item) {
+        return (
+          item.numeroLinha !==
+          numeroLinha
+        );
+      });
+
+  if (conflitoGoogle) {
+    return {
+      authorized: false,
+      reason:
+        'GOOGLE_ID_CONFLICT'
+    };
+  }
+
+  /*
+   * Se a linha correta pelo e-mail já possui um Google ID,
+   * ele precisa ser exatamente o Google ID da sessão atual.
+   */
+  if (
+    idCadastradoNaLinha &&
+    idCadastradoNaLinha !==
+      googleId
+  ) {
+    return {
+      authorized: false,
+      reason:
+        'GOOGLE_ID_MISMATCH'
+    };
+  }
+
+  const ativo =
+    String(
+      linha[
+        idx.ativo
+      ] || ''
+    )
+      .trim()
+      .toUpperCase();
 
   if (
     ![
@@ -199,85 +348,106 @@ if (!ss) {
       'S',
       'ATIVO',
       'TRUE'
-    ].includes(ativo)
+    ].includes(
+      ativo
+    )
   ) {
     return {
       authorized: false,
-      reason: 'USER_INACTIVE'
+      reason:
+        'USER_INACTIVE'
     };
   }
 
-  const perfil = String(
-    linha[idx.perfil] || ''
-  ).trim();
+  const perfil =
+    String(
+      linha[
+        idx.perfil
+      ] || ''
+    ).trim();
 
-  /*
-   * V0.9:
-   * perfil desconhecido NÃO vira Professor.
-   * Autorização falha fechada.
-   */
   if (
     !NAVE_IDENTIDADE_V090
       .PERFIS_VALIDOS
-      .includes(perfil)
+      .includes(
+        perfil
+      )
   ) {
     return {
       authorized: false,
-      reason: 'INVALID_PROFILE'
+      reason:
+        'INVALID_PROFILE'
     };
   }
 
-  const disciplinas = String(
-    linha[idx.disciplinas] || ''
-  )
-    .split(/[;,]/)
-    .map(function(v) {
-      return v.trim();
-    })
-    .filter(Boolean);
+  const disciplinas =
+    String(
+      linha[
+        idx.disciplinas
+      ] || ''
+    )
+      .split(/[;,]/)
+      .map(function(v) {
+        return v.trim();
+      })
+      .filter(Boolean);
 
   /*
-   * Se encontramos pelo e-mail autenticado
-   * e ainda não havia Google ID cadastrado,
-   * fazemos o vínculo estável.
+   * Só vinculamos o Google ID quando:
+   *
+   * 1. email_autenticacao encontrou exatamente uma linha;
+   * 2. não há Google ID conflitante;
+   * 3. a linha ainda não possui Google ID;
+   * 4. o usuário está ativo e possui perfil válido.
    */
   if (
-  devePersistir &&
-  !String(
-    linha[idx.id_google] || ''
-  ).trim()
-) {
-  aba
-    .getRange(
-      numeroLinha,
-      idx.id_google + 1
-    )
-    .setValue(googleId);
-}
+    devePersistir &&
+    !idCadastradoNaLinha
+  ) {
+    aba
+      .getRange(
+        numeroLinha,
+        idx.id_google + 1
+      )
+      .setValue(
+        googleId
+      );
+  }
 
-if (devePersistir) {
-  aba
-    .getRange(
-      numeroLinha,
-      idx.ultimo_login_em + 1
-    )
-    .setValue(new Date());
-}
+  if (devePersistir) {
+    aba
+      .getRange(
+        numeroLinha,
+        idx.ultimo_login_em + 1
+      )
+      .setValue(
+        new Date()
+      );
+  }
 
   const permissoes =
     obterPermissoesPerfilNaveV090_(
       perfil
     );
 
+  if (!permissoes) {
+    return {
+      authorized: false,
+      reason:
+        'INVALID_PROFILE'
+    };
+  }
+
   return {
     authorized: true,
 
     user: {
-      email: String(
-        linha[idx.email] || ''
-      )
-        .trim()
-        .toLowerCase(),
+      email:
+        normalizarEmailIdentidadeNaveV091_(
+          linha[
+            idx.email
+          ]
+        ),
 
       emailAutenticacao:
         emailAuth,
@@ -285,15 +455,22 @@ if (devePersistir) {
       idGoogle:
         googleId,
 
-      nome: String(
-        linha[idx.nome] || ''
-      ).trim(),
+      nome:
+        String(
+          linha[
+            idx.nome
+          ] || ''
+        ).trim(),
 
-      perfil: perfil,
+      perfil:
+        perfil,
 
-      area: String(
-        linha[idx.area] || ''
-      ).trim(),
+      area:
+        String(
+          linha[
+            idx.area
+          ] || ''
+        ).trim(),
 
       disciplinas:
         disciplinas
@@ -393,10 +570,14 @@ function garantirCamposIdentidadeNaveV090_(
     NAVE_IDENTIDADE_V090
       .CAMPOS_IDENTIDADE
       .filter(function(campo) {
-        return !headers.includes(campo);
+        return !headers.includes(
+          campo
+        );
       });
 
-  if (ausentes.length) {
+  if (
+    ausentes.length
+  ) {
     aba
       .getRange(
         1,
@@ -410,19 +591,108 @@ function garantirCamposIdentidadeNaveV090_(
   }
 }
 
+function obterCabecalhosIdentidadeNaveV091_(
+  aba
+) {
+  if (
+    !aba ||
+    aba.getLastColumn() < 1
+  ) {
+    return [];
+  }
+
+  return aba
+    .getRange(
+      1,
+      1,
+      1,
+      aba.getLastColumn()
+    )
+    .getDisplayValues()[0]
+    .map(function(v) {
+      return String(
+        v || ''
+      ).trim();
+    });
+}
+
+function validarCabecalhosIdentidadeNaveV091_(
+  headers,
+  lancarErro
+) {
+  const deveLancar =
+    lancarErro !== false;
+
+  const existentes =
+    new Set(
+      (headers || [])
+        .map(function(v) {
+          return String(
+            v || ''
+          ).trim();
+        })
+        .filter(Boolean)
+    );
+
+  const ausentes =
+    NAVE_IDENTIDADE_V090
+      .CAMPOS_OBRIGATORIOS
+      .filter(function(campo) {
+        return !existentes.has(
+          campo
+        );
+      });
+
+  if (
+    ausentes.length > 0
+  ) {
+    if (deveLancar) {
+      throw new Error(
+        'A aba USUARIOS não possui os campos obrigatórios: ' +
+          ausentes.join(', ')
+      );
+    }
+
+    return {
+      ok: false,
+      ausentes: ausentes
+    };
+  }
+
+  return {
+    ok: true,
+    ausentes: []
+  };
+}
+
 
 /* =========================================================
-   UTILITÁRIO
+   UTILITÁRIOS
 ========================================================= */
+
+function normalizarEmailIdentidadeNaveV091_(
+  value
+) {
+  return String(
+    value || ''
+  )
+    .trim()
+    .toLowerCase();
+}
 
 function indexarIdentidadeNaveV090_(
   headers
 ) {
   return headers.reduce(
-    function(mapa, header, indice) {
-      const chave = String(
-        header || ''
-      ).trim();
+    function(
+      mapa,
+      header,
+      indice
+    ) {
+      const chave =
+        String(
+          header || ''
+        ).trim();
 
       if (chave) {
         mapa[chave] =
@@ -437,7 +707,211 @@ function indexarIdentidadeNaveV090_(
 
 
 /* =========================================================
-   TESTE DE ESTRUTURA
+   AUDITORIA DE IDENTIDADE — V0.11.7.2
+========================================================= */
+
+function auditarIdentidadesNaveV091() {
+  const ss =
+    SpreadsheetApp
+      .getActiveSpreadsheet();
+
+  if (!ss) {
+    throw new Error(
+      'Planilha ativa não encontrada.'
+    );
+  }
+
+  const aba =
+    ss.getSheetByName(
+      NAVE_IDENTIDADE_V090
+        .ABA_USUARIOS
+    );
+
+  if (
+    !aba ||
+    aba.getLastRow() < 2
+  ) {
+    throw new Error(
+      'A aba USUARIOS não está configurada.'
+    );
+  }
+
+  garantirCamposIdentidadeNaveV090_(
+    aba
+  );
+
+  const dados =
+    aba
+      .getDataRange()
+      .getDisplayValues();
+
+  validarCabecalhosIdentidadeNaveV091_(
+    dados[0]
+  );
+
+  const idx =
+    indexarIdentidadeNaveV090_(
+      dados[0]
+    );
+
+  const porEmail =
+    {};
+
+  const porGoogle =
+    {};
+
+  const linhas =
+    [];
+
+  for (
+    let i = 1;
+    i < dados.length;
+    i++
+  ) {
+    const row =
+      dados[i];
+
+    const emailAuth =
+      normalizarEmailIdentidadeNaveV091_(
+        row[
+          idx.email_autenticacao
+        ]
+      );
+
+    const googleId =
+      String(
+        row[
+          idx.id_google
+        ] || ''
+      ).trim();
+
+    if (emailAuth) {
+      porEmail[emailAuth] =
+        porEmail[emailAuth] || [];
+
+      porEmail[emailAuth]
+        .push(
+          i + 1
+        );
+    }
+
+    if (googleId) {
+      porGoogle[googleId] =
+        porGoogle[googleId] || [];
+
+      porGoogle[googleId]
+        .push(
+          i + 1
+        );
+    }
+
+    linhas.push({
+      linha:
+        i + 1,
+
+      email:
+        normalizarEmailIdentidadeNaveV091_(
+          row[
+            idx.email
+          ]
+        ),
+
+      emailAutenticacao:
+        emailAuth,
+
+      possuiIdGoogle:
+        Boolean(
+          googleId
+        ),
+
+      perfil:
+        String(
+          row[
+            idx.perfil
+          ] || ''
+        ).trim(),
+
+      ativo:
+        String(
+          row[
+            idx.ativo
+          ] || ''
+        ).trim()
+    });
+  }
+
+  const emailsDuplicados =
+    Object.keys(
+      porEmail
+    )
+      .filter(function(email) {
+        return (
+          porEmail[email].length >
+          1
+        );
+      })
+      .map(function(email) {
+        return {
+          emailAutenticacao:
+            email,
+          linhas:
+            porEmail[email]
+        };
+      });
+
+  const googleIdsDuplicados =
+    Object.keys(
+      porGoogle
+    )
+      .filter(function(id) {
+        return (
+          porGoogle[id].length >
+          1
+        );
+      })
+      .map(function(id) {
+        return {
+          idGoogle:
+            id,
+          linhas:
+            porGoogle[id]
+        };
+      });
+
+  const resultado = {
+    ok:
+      emailsDuplicados.length ===
+        0 &&
+      googleIdsDuplicados.length ===
+        0,
+
+    totalUsuarios:
+      linhas.length,
+
+    emailsDuplicados:
+      emailsDuplicados,
+
+    googleIdsDuplicados:
+      googleIdsDuplicados,
+
+    usuarios:
+      linhas
+  };
+
+  Logger.log(
+    JSON.stringify(
+      resultado,
+      null,
+      2
+    )
+  );
+
+  return resultado;
+}
+
+
+/* =========================================================
+   TESTES
 ========================================================= */
 
 function testarEstruturaIdentidadeNaveV090() {
@@ -449,17 +923,18 @@ function testarEstruturaIdentidadeNaveV090() {
       resultado.ok,
     aba:
       resultado.aba,
-    esperado:
-      [
-        'email_autenticacao',
-        'id_google',
-        'ultimo_login_em'
-      ]
+    esperado: [
+      'email_autenticacao',
+      'id_google',
+      'ultimo_login_em'
+    ]
   };
 }
+
 function testarResolucaoIdentidadeNaveV090() {
   const ss =
-    SpreadsheetApp.getActiveSpreadsheet();
+    SpreadsheetApp
+      .getActiveSpreadsheet();
 
   if (!ss) {
     throw new Error(
@@ -469,7 +944,8 @@ function testarResolucaoIdentidadeNaveV090() {
 
   const aba =
     ss.getSheetByName(
-      NAVE_IDENTIDADE_V090.ABA_USUARIOS
+      NAVE_IDENTIDADE_V090
+        .ABA_USUARIOS
     );
 
   if (
@@ -509,25 +985,16 @@ function testarResolucaoIdentidadeNaveV090() {
   }
 
   const emailAutenticacao =
-    String(
+    normalizarEmailIdentidadeNaveV091_(
       linha[
         idx.email_autenticacao
-      ] || ''
-    )
-      .trim()
-      .toLowerCase();
+      ]
+    );
 
-  /*
-   * ID fictício.
-   *
-   * Como persistirVinculo = false,
-   * nada será gravado em id_google
-   * nem em ultimo_login_em.
-   */
   const resultado =
     obterContextoUsuarioAutenticadoV090_(
       emailAutenticacao,
-      'TESTE_SOMENTE_LEITURA_V090',
+      'TESTE_SOMENTE_LEITURA_V091',
       ss,
       false
     );

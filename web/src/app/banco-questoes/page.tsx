@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import QuestionBankSearchV01131 from "@/components/QuestionBankSearchV01131";
+import QuestionBankSearchV01132 from "@/components/QuestionBankSearchV01132";
 
 import {
   requireNavePermission,
@@ -38,7 +38,7 @@ export default async function BancoQuestoesPage() {
         </div>
 
         <div className="mt-8">
-          <QuestionBankSearchV01131 />
+          <QuestionBankSearchV01132 />
         </div>
       </div>
     </main>

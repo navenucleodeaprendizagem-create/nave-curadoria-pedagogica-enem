@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import {
   useEffect,
   useMemo,
@@ -414,36 +416,47 @@ const rankedQuestions =
     <div className="space-y-6">
 
       {/* ===================================================
-          IDENTIDADE NAVE
+          IDENTIDADE NAVE — V0.11.4.1
       =================================================== */}
 
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-gradient-to-r from-teal-50 via-white to-slate-50 px-6 py-6 sm:px-8">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-teal-200 bg-white shadow-sm">
-                <span className="text-lg font-black tracking-[0.14em] text-teal-800">
-                  NAVE
-                </span>
+        <div className="bg-gradient-to-r from-teal-50/80 via-white to-slate-50 px-6 py-5 sm:px-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4 sm:gap-5">
+              <div className="flex h-20 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm sm:h-24 sm:w-20">
+                <Image
+                  src="/logo-nave.jpg"
+                  alt="Logo NAVE"
+                  width={481}
+                  height={634}
+                  priority
+                  className="h-full w-full object-contain"
+                />
               </div>
 
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-teal-700 sm:text-xs">
                   Curadoria Pedagógica ENEM
                 </p>
 
                 <h1 className="mt-1 text-xl font-bold tracking-tight text-slate-950 sm:text-2xl">
-                  NAVE | Sistema de Inteligência e Gestão da Aprendizagem
+                  Sistema de Inteligência e Gestão da Aprendizagem
                 </h1>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Banco inteligente para seleção, validação e organização pedagógica de questões.
+                  Seleção, validação e organização pedagógica de questões do ENEM.
                 </p>
               </div>
             </div>
 
-            <div className="self-start rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 sm:self-center">
-              V0.11.4.0
+            <div className="flex items-center gap-3 self-start sm:self-center">
+              <span className="hidden text-xs font-medium text-slate-400 lg:inline">
+                Banco de questões
+              </span>
+
+              <div className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800">
+                V0.11.4.1
+              </div>
             </div>
           </div>
         </div>

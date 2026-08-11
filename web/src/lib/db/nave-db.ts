@@ -353,6 +353,659 @@ export async function countQuestions(): Promise<number> {
   });
 }
 
+
+/* =========================================================
+   SEQUÊNCIAS PEDAGÓGICAS — V0.11.5.1
+========================================================= */
+
+export type NaveSequenceStatus =
+  | "rascunho"
+  | "pronta"
+  | "arquivada";
+
+export interface NaveSequenceRecord {
+  id: string;
+  titulo: string;
+  descricao: string;
+  status: NaveSequenceStatus;
+  quantidadeItens: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NaveSequenceItemRecord {
+  id: string;
+  sequenceId: string;
+  questionId: string;
+  position: number;
+  addedAt: string;
+}
+
+export interface NaveSequenceWithItems {
+  sequence: NaveSequenceRecord;
+  items: NaveSequenceItemRecord[];
+}
+
+export interface CreateNaveSequenceInput {
+  titulo: string;
+  descricao?: string;
+  questionIds: string[];
+}
+
+
+/* ---------------------------------------------------------
+   CRIAÇÃO / PERSISTÊNCIA
+--------------------------------------------------------- */
+
+export async function createLocalSequence(
+  input: CreateNaveSequenceInput
+): Promise<NaveSequenceWithItems> {
+  const titulo =
+    String(input.titulo ?? "").trim();
+
+  const descricao =
+    String(input.descricao ?? "").trim();
+
+  const questionIds =
+    input.questionIds
+      .map((id) =>
+        String(id ?? "").trim()
+      )
+      .filter(Boolean);
+
+  if (!titulo) {
+    throw new Error(
+      "Informe um nome para a sequência."
+    );
+  }
+
+  if (questionIds.length === 0) {
+    throw new Error(
+      "Selecione pelo menos uma questão para salvar a sequência."
+    );
+  }
+
+  const uniqueQuestionIds =
+    [...new Set(questionIds)];
+
+  if (
+    uniqueQuestionIds.length !==
+    questionIds.length
+  ) {
+    throw new Error(
+      "A sequência contém questões duplicadas."
+    );
+  }
+
+  const now =
+    new Date().toISOString();
+
+  const sequenceId =
+    crypto.randomUUID();
+
+  const sequence: NaveSequenceRecord = {
+    id: sequenceId,
+    titulo,
+    descricao,
+    status: "rascunho",
+    quantidadeItens:
+      questionIds.length,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const items:
+    NaveSequenceItemRecord[] =
+    questionIds.map(
+      (
+        questionId,
+        index
+      ) => ({
+        id: crypto.randomUUID(),
+        sequenceId,
+        questionId,
+        position: index + 1,
+        addedAt: now,
+      })
+    );
+
+  const db =
+    await openNaveDb();
+
+  return new Promise(
+    (resolve, reject) => {
+      const transaction =
+        db.transaction(
+          [
+            STORES.SEQUENCES,
+            STORES.SEQUENCE_ITEMS,
+          ],
+          "readwrite"
+        );
+
+      const sequenceStore =
+        transaction.objectStore(
+          STORES.SEQUENCES
+        );
+
+      const itemStore =
+        transaction.objectStore(
+          STORES.SEQUENCE_ITEMS
+        );
+
+      sequenceStore.put(
+        sequence
+      );
+
+      for (const item of items) {
+        itemStore.put(item);
+      }
+
+      transaction.oncomplete =
+        () => {
+          db.close();
+
+          resolve({
+            sequence,
+            items,
+          });
+        };
+
+      transaction.onerror =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "Falha ao salvar a sequência no banco local."
+              )
+          );
+        };
+
+      transaction.onabort =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "O salvamento da sequência foi interrompido."
+              )
+          );
+        };
+    }
+  );
+}
+
+
+/* ---------------------------------------------------------
+   LEITURA
+--------------------------------------------------------- */
+
+export async function getAllLocalSequences(): Promise<
+  NaveSequenceRecord[]
+> {
+  const db =
+    await openNaveDb();
+
+  return new Promise(
+    (resolve, reject) => {
+      const transaction =
+        db.transaction(
+          STORES.SEQUENCES,
+          "readonly"
+        );
+
+      const store =
+        transaction.objectStore(
+          STORES.SEQUENCES
+        );
+
+      const request =
+        store.getAll();
+
+      request.onsuccess =
+        () => {
+          const sequences =
+            (
+              request.result as
+                NaveSequenceRecord[]
+            ).sort(
+              (a, b) =>
+                b.updatedAt.localeCompare(
+                  a.updatedAt
+                )
+            );
+
+          db.close();
+          resolve(sequences);
+        };
+
+      request.onerror =
+        () => {
+          db.close();
+
+          reject(
+            request.error ??
+              new Error(
+                "Falha ao ler as sequências locais."
+              )
+          );
+        };
+    }
+  );
+}
+
+
+export async function getLocalSequence(
+  id: string
+): Promise<
+  NaveSequenceRecord | undefined
+> {
+  const db =
+    await openNaveDb();
+
+  return new Promise(
+    (resolve, reject) => {
+      const transaction =
+        db.transaction(
+          STORES.SEQUENCES,
+          "readonly"
+        );
+
+      const store =
+        transaction.objectStore(
+          STORES.SEQUENCES
+        );
+
+      const request =
+        store.get(id);
+
+      request.onsuccess =
+        () => {
+          const result =
+            request.result as
+              | NaveSequenceRecord
+              | undefined;
+
+          db.close();
+          resolve(result);
+        };
+
+      request.onerror =
+        () => {
+          db.close();
+
+          reject(
+            request.error ??
+              new Error(
+                "Falha ao ler a sequência local."
+              )
+          );
+        };
+    }
+  );
+}
+
+
+export async function getLocalSequenceItems(
+  sequenceId: string
+): Promise<
+  NaveSequenceItemRecord[]
+> {
+  const db =
+    await openNaveDb();
+
+  return new Promise(
+    (resolve, reject) => {
+      const transaction =
+        db.transaction(
+          STORES.SEQUENCE_ITEMS,
+          "readonly"
+        );
+
+      const store =
+        transaction.objectStore(
+          STORES.SEQUENCE_ITEMS
+        );
+
+      const request =
+        store.getAll();
+
+      request.onsuccess =
+        () => {
+          const items =
+            (
+              request.result as
+                NaveSequenceItemRecord[]
+            )
+              .filter(
+                (item) =>
+                  item.sequenceId ===
+                  sequenceId
+              )
+              .sort(
+                (a, b) =>
+                  a.position -
+                  b.position
+              );
+
+          db.close();
+          resolve(items);
+        };
+
+      request.onerror =
+        () => {
+          db.close();
+
+          reject(
+            request.error ??
+              new Error(
+                "Falha ao ler os itens da sequência local."
+              )
+          );
+        };
+    }
+  );
+}
+
+
+export async function getLocalSequenceWithItems(
+  sequenceId: string
+): Promise<
+  NaveSequenceWithItems | undefined
+> {
+  const sequence =
+    await getLocalSequence(
+      sequenceId
+    );
+
+  if (!sequence) {
+    return undefined;
+  }
+
+  const items =
+    await getLocalSequenceItems(
+      sequenceId
+    );
+
+  return {
+    sequence,
+    items,
+  };
+}
+
+
+/* ---------------------------------------------------------
+   ATUALIZAÇÃO DA ORDEM
+--------------------------------------------------------- */
+
+export async function replaceLocalSequenceItems(
+  sequenceId: string,
+  questionIds: string[]
+): Promise<void> {
+  const normalizedIds =
+    questionIds
+      .map((id) =>
+        String(id ?? "").trim()
+      )
+      .filter(Boolean);
+
+  if (
+    normalizedIds.length === 0
+  ) {
+    throw new Error(
+      "A sequência precisa conter pelo menos uma questão."
+    );
+  }
+
+  if (
+    new Set(normalizedIds).size !==
+    normalizedIds.length
+  ) {
+    throw new Error(
+      "A sequência contém questões duplicadas."
+    );
+  }
+
+  const db =
+    await openNaveDb();
+
+  return new Promise(
+    (resolve, reject) => {
+      const transaction =
+        db.transaction(
+          [
+            STORES.SEQUENCES,
+            STORES.SEQUENCE_ITEMS,
+          ],
+          "readwrite"
+        );
+
+      const sequenceStore =
+        transaction.objectStore(
+          STORES.SEQUENCES
+        );
+
+      const itemStore =
+        transaction.objectStore(
+          STORES.SEQUENCE_ITEMS
+        );
+
+      const getSequenceRequest =
+        sequenceStore.get(
+          sequenceId
+        );
+
+      getSequenceRequest.onsuccess =
+        () => {
+          const sequence =
+            getSequenceRequest.result as
+              | NaveSequenceRecord
+              | undefined;
+
+          if (!sequence) {
+            transaction.abort();
+            return;
+          }
+
+          const getItemsRequest =
+            itemStore.getAll();
+
+          getItemsRequest.onsuccess =
+            () => {
+              const existingItems =
+                (
+                  getItemsRequest.result as
+                    NaveSequenceItemRecord[]
+                ).filter(
+                  (item) =>
+                    item.sequenceId ===
+                    sequenceId
+                );
+
+              for (
+                const item of
+                existingItems
+              ) {
+                itemStore.delete(
+                  item.id
+                );
+              }
+
+              const now =
+                new Date().toISOString();
+
+              normalizedIds.forEach(
+                (
+                  questionId,
+                  index
+                ) => {
+                  itemStore.put({
+                    id:
+                      crypto.randomUUID(),
+                    sequenceId,
+                    questionId,
+                    position:
+                      index + 1,
+                    addedAt: now,
+                  } satisfies NaveSequenceItemRecord);
+                }
+              );
+
+              sequenceStore.put({
+                ...sequence,
+                quantidadeItens:
+                  normalizedIds.length,
+                updatedAt: now,
+              });
+            };
+
+          getItemsRequest.onerror =
+            () => {
+              transaction.abort();
+            };
+        };
+
+      getSequenceRequest.onerror =
+        () => {
+          transaction.abort();
+        };
+
+      transaction.oncomplete =
+        () => {
+          db.close();
+          resolve();
+        };
+
+      transaction.onerror =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "Falha ao atualizar a ordem da sequência."
+              )
+          );
+        };
+
+      transaction.onabort =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "A atualização da sequência foi interrompida."
+              )
+          );
+        };
+    }
+  );
+}
+
+
+/* ---------------------------------------------------------
+   EXCLUSÃO
+--------------------------------------------------------- */
+
+export async function deleteLocalSequence(
+  sequenceId: string
+): Promise<void> {
+  const db =
+    await openNaveDb();
+
+  return new Promise(
+    (resolve, reject) => {
+      const transaction =
+        db.transaction(
+          [
+            STORES.SEQUENCES,
+            STORES.SEQUENCE_ITEMS,
+          ],
+          "readwrite"
+        );
+
+      const sequenceStore =
+        transaction.objectStore(
+          STORES.SEQUENCES
+        );
+
+      const itemStore =
+        transaction.objectStore(
+          STORES.SEQUENCE_ITEMS
+        );
+
+      sequenceStore.delete(
+        sequenceId
+      );
+
+      const getItemsRequest =
+        itemStore.getAll();
+
+      getItemsRequest.onsuccess =
+        () => {
+          const items =
+            getItemsRequest.result as
+              NaveSequenceItemRecord[];
+
+          for (const item of items) {
+            if (
+              item.sequenceId ===
+              sequenceId
+            ) {
+              itemStore.delete(
+                item.id
+              );
+            }
+          }
+        };
+
+      getItemsRequest.onerror =
+        () => {
+          transaction.abort();
+        };
+
+      transaction.oncomplete =
+        () => {
+          db.close();
+          resolve();
+        };
+
+      transaction.onerror =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "Falha ao excluir a sequência local."
+              )
+          );
+        };
+
+      transaction.onabort =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "A exclusão da sequência foi interrompida."
+              )
+          );
+        };
+    }
+  );
+}
+
+
+/* =========================================================
+   FILA DE SINCRONIZAÇÃO
+========================================================= */
+
 export type SyncOperationStatus =
   | "pending"
   | "processing"

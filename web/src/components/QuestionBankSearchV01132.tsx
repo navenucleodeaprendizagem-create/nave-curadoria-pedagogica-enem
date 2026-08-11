@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import {
+  createLocalSequence,
   getAllQuestions,
   type NaveQuestionRecord,
 } from "@/lib/db/nave-db";
@@ -220,6 +221,21 @@ export default function QuestionBankSearchV01132() {
   const [selectedQuestionIds, setSelectedQuestionIds] =
     useState<string[]>([]);
 
+  const [sequenceTitle, setSequenceTitle] =
+    useState("");
+
+  const [sequenceDescription, setSequenceDescription] =
+    useState("");
+
+  const [savingSequence, setSavingSequence] =
+    useState(false);
+
+  const [sequenceSaveError, setSequenceSaveError] =
+    useState("");
+
+  const [sequenceSaveSuccess, setSequenceSaveSuccess] =
+    useState("");
+
   useEffect(() => {
     async function load() {
       try {
@@ -388,7 +404,7 @@ const rankedQuestions =
       .length;
 
   /* =======================================================
-     SELEÇÃO ATUAL — V0.11.5.0
+     SELEÇÃO ATUAL — V0.11.5.1
   ======================================================= */
 
   const selectedQuestions =
@@ -439,10 +455,15 @@ const rankedQuestions =
               questionId,
             ]
     );
+
+    setSequenceSaveSuccess("");
+    setSequenceSaveError("");
   }
 
   function clearSelection() {
     setSelectedQuestionIds([]);
+    setSequenceSaveSuccess("");
+    setSequenceSaveError("");
   }
 
   function moveSelectedQuestion(
@@ -476,6 +497,63 @@ const rankedQuestions =
         return next;
       }
     );
+
+    setSequenceSaveSuccess("");
+    setSequenceSaveError("");
+  }
+
+  async function saveCurrentSequence() {
+    const titulo =
+      sequenceTitle.trim();
+
+    if (!titulo) {
+      setSequenceSaveError(
+        "Informe um nome para a sequência."
+      );
+      setSequenceSaveSuccess("");
+      return;
+    }
+
+    if (
+      selectedQuestionIds.length === 0
+    ) {
+      setSequenceSaveError(
+        "Selecione pelo menos uma questão antes de salvar."
+      );
+      setSequenceSaveSuccess("");
+      return;
+    }
+
+    try {
+      setSavingSequence(true);
+      setSequenceSaveError("");
+      setSequenceSaveSuccess("");
+
+      const saved =
+        await createLocalSequence({
+          titulo,
+          descricao:
+            sequenceDescription.trim(),
+          questionIds:
+            selectedQuestionIds,
+        });
+
+      setSequenceSaveSuccess(
+        `Sequência “${saved.sequence.titulo}” salva como rascunho com ${saved.sequence.quantidadeItens} questão(ões).`
+      );
+
+      setSequenceTitle("");
+      setSequenceDescription("");
+      setSelectedQuestionIds([]);
+    } catch (err) {
+      setSequenceSaveError(
+        err instanceof Error
+          ? err.message
+          : "Falha ao salvar a sequência."
+      );
+    } finally {
+      setSavingSequence(false);
+    }
   }
 
   /* =======================================================
@@ -510,7 +588,7 @@ const rankedQuestions =
     <div className="space-y-6">
 
       {/* ===================================================
-          IDENTIDADE NAVE — V0.11.5.0
+          IDENTIDADE NAVE — V0.11.5.1
       =================================================== */}
 
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -549,7 +627,7 @@ const rankedQuestions =
               </span>
 
               <div className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800">
-                V0.11.5.0
+                V0.11.5.1
               </div>
             </div>
           </div>
@@ -728,6 +806,22 @@ const rankedQuestions =
           </div>
         </div>
 
+        {sequenceSaveSuccess ? (
+          <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <p className="text-sm font-semibold text-emerald-800">
+              {sequenceSaveSuccess}
+            </p>
+          </div>
+        ) : null}
+
+        {sequenceSaveError ? (
+          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+            <p className="text-sm font-semibold text-red-700">
+              {sequenceSaveError}
+            </p>
+          </div>
+        ) : null}
+
         {selectedQuestions.length === 0 ? (
           <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-5">
             <p className="text-sm font-semibold text-slate-700">
@@ -831,13 +925,78 @@ const rankedQuestions =
               )
             )}
 
-            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3">
-              <p className="text-xs font-semibold text-amber-900">
-                V0.11.5.0 — seleção ainda não persistida
-              </p>
+            <div className="rounded-2xl border border-teal-100 bg-teal-50/50 p-4">
+              <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr_auto] lg:items-end">
+                <div>
+                  <label
+                    htmlFor="sequenceTitle"
+                    className="text-xs font-bold text-slate-700"
+                  >
+                    Nome da sequência
+                  </label>
 
-              <p className="mt-1 text-xs leading-5 text-amber-800">
-                Nesta etapa, a seleção permanece apenas enquanto a página estiver aberta. O salvamento no IndexedDB e a criação de uma sequência serão incorporados na próxima etapa.
+                  <input
+                    id="sequenceTitle"
+                    type="text"
+                    value={sequenceTitle}
+                    onChange={(event) => {
+                      setSequenceTitle(
+                        event.target.value
+                      );
+                      setSequenceSaveError("");
+                      setSequenceSaveSuccess("");
+                    }}
+                    placeholder="Ex.: Química orgânica — revisão"
+                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="sequenceDescription"
+                    className="text-xs font-bold text-slate-700"
+                  >
+                    Descrição
+                    <span className="ml-1 font-normal text-slate-400">
+                      opcional
+                    </span>
+                  </label>
+
+                  <input
+                    id="sequenceDescription"
+                    type="text"
+                    value={sequenceDescription}
+                    onChange={(event) => {
+                      setSequenceDescription(
+                        event.target.value
+                      );
+                      setSequenceSaveError("");
+                      setSequenceSaveSuccess("");
+                    }}
+                    placeholder="Objetivo, turma ou observação pedagógica"
+                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    void saveCurrentSequence()
+                  }
+                  disabled={
+                    savingSequence ||
+                    selectedQuestions.length === 0
+                  }
+                  className="rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {savingSequence
+                    ? "Salvando..."
+                    : "Salvar sequência"}
+                </button>
+              </div>
+
+              <p className="mt-3 text-xs leading-5 text-teal-900/70">
+                A sequência será gravada como rascunho no banco local deste navegador, preservando a ordem definida acima.
               </p>
             </div>
           </div>

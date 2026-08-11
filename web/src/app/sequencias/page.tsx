@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import SequenciasClient from "@/components/SequenciasClientV01152";
+import { SYSTEM_VERSION } from "@/lib/system-version";
 
 import {
   requireNavePermission,
@@ -55,9 +56,18 @@ export default async function SequenciasPage() {
             </div>
 
             <div className="flex flex-col items-start gap-2 sm:items-end">
-              <span className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">
-                V0.11.7.0
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href="/banco-questoes"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
+                >
+                  Buscar questões
+                </Link>
+
+                <span className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-800">
+                  {SYSTEM_VERSION}
+                </span>
+              </div>
 
               <p className="text-xs text-slate-500">
                 Usuário: {user.nome} · Perfil: {user.perfil}

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import Image from "next/image";
 
 import {
@@ -7,6 +9,8 @@ import {
   useMemo,
   useState,
 } from "react";
+
+import { SYSTEM_VERSION } from "@/lib/system-version";
 
 import {
   appendLocalSequenceItems,
@@ -437,7 +441,7 @@ const rankedQuestions =
       .length;
 
   /* =======================================================
-     SELEÇÃO ATUAL — V0.11.7.0
+     SELEÇÃO ATUAL — {SYSTEM_VERSION}
   ======================================================= */
 
   const selectedQuestions =
@@ -642,7 +646,7 @@ const rankedQuestions =
           : "";
 
       setSequenceSaveSuccess(
-        `${added} questão(ões) adicionada(s) à sequência “${result.sequence.titulo}”.${duplicateText}`
+        `${added} questão(ões) adicionada(s) à sequência “${result.sequence.titulo}”.${duplicateText} Você pode conferi-la em Sequências pedagógicas.`
       );
 
       const refreshedSequences =
@@ -696,7 +700,7 @@ const rankedQuestions =
     <div className="space-y-6">
 
       {/* ===================================================
-          IDENTIDADE NAVE — V0.11.7.0
+          IDENTIDADE NAVE — {SYSTEM_VERSION}
       =================================================== */}
 
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -729,13 +733,20 @@ const rankedQuestions =
               </div>
             </div>
 
-            <div className="flex items-center gap-3 self-start sm:self-center">
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+              <Link
+                href="/sequencias"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
+              >
+                Ver sequências
+              </Link>
+
               <span className="hidden text-xs font-medium text-slate-400 lg:inline">
                 Banco de questões
               </span>
 
               <div className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800">
-                V0.11.7.0
+                {SYSTEM_VERSION}
               </div>
             </div>
           </div>

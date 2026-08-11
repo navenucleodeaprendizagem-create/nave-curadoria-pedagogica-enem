@@ -1,10 +1,14 @@
 "use client";
 
+import Link from "next/link";
+
 import {
   useCallback,
   useEffect,
   useState,
 } from "react";
+
+import { SYSTEM_VERSION } from "@/lib/system-version";
 
 import {
   deleteLocalSequence,
@@ -544,7 +548,7 @@ export default function SequenciasClient() {
             </h2>
 
             <span className="rounded-full border border-teal-200 bg-white px-2.5 py-1 text-[10px] font-bold text-teal-800">
-              V0.11.7.0
+              {SYSTEM_VERSION}
             </span>
           </div>
 
@@ -553,7 +557,14 @@ export default function SequenciasClient() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/banco-questoes"
+            className="rounded-xl border border-teal-200 bg-white px-3 py-2 text-xs font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50"
+          >
+            Adicionar questões
+          </Link>
+
           <span className="rounded-full bg-teal-50 px-3 py-1.5 text-sm font-bold text-teal-800">
             {sequences.length} sequência(s)
           </span>
@@ -608,6 +619,13 @@ export default function SequenciasClient() {
           <p className="mt-1 text-xs leading-5 text-slate-500">
             Crie uma sequência no Banco de questões. Ela aparecerá aqui automaticamente.
           </p>
+
+          <Link
+            href="/banco-questoes"
+            className="mt-4 inline-flex rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800"
+          >
+            Ir para o Banco de questões
+          </Link>
         </div>
       ) : null}
 

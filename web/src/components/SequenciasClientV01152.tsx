@@ -544,7 +544,7 @@ export default function SequenciasClient() {
             </h2>
 
             <span className="rounded-full border border-teal-200 bg-white px-2.5 py-1 text-[10px] font-bold text-teal-800">
-              V0.11.6.0
+              V0.11.7.0
             </span>
           </div>
 

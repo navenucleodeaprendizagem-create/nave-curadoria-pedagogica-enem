@@ -28,6 +28,25 @@ export async function requireNavePermission(
     redirect("/");
   }
 
+  /*
+   * V0.11.7.1
+   *
+   * Falha técnica NÃO é falta de autorização.
+   * Voltamos ao início, onde o NaveAccessGate fará
+   * nova tentativa e mostrará mensagem técnica se
+   * o backend continuar indisponível.
+   */
+  if (context.ok !== true) {
+    redirect(
+      "/?naveAuth=verification-failed"
+    );
+  }
+
+  /*
+   * Só chegamos a "motivo=usuario" quando o
+   * backend respondeu corretamente e confirmou
+   * que a conta não está autorizada.
+   */
   if (
     context.authorized !== true ||
     !context.user ||

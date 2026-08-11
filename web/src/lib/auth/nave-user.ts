@@ -1,5 +1,3 @@
-import { unstable_cache } from "next/cache";
-
 import { auth } from "@/auth";
 
 export type NavePermissions = {
@@ -31,11 +29,24 @@ export type NaveUserContext = {
   permissions?: NavePermissions | null;
 };
 
+const TECHNICAL_REASONS = new Set([
+  "SERVER_CONFIGURATION_ERROR",
+  "INVALID_BACKEND_RESPONSE",
+  "BACKEND_ERROR",
+  "BACKEND_UNAVAILABLE",
+]);
+
+function sleep(ms: number) {
+  return new Promise((resolve) =>
+    setTimeout(resolve, ms)
+  );
+}
+
 /* =========================================================
    BACKEND NAVE
 ========================================================= */
 
-async function fetchNaveUserContext(
+async function fetchNaveUserContextOnce(
   emailAutenticacao: string,
   idGoogle: string
 ): Promise<NaveUserContext> {
@@ -54,6 +65,15 @@ async function fetchNaveUserContext(
     };
   }
 
+  const controller =
+    new AbortController();
+
+  const timeoutId =
+    setTimeout(
+      () => controller.abort(),
+      8000
+    );
+
   try {
     const response =
       await fetch(
@@ -67,6 +87,9 @@ async function fetchNaveUserContext(
           },
 
           cache: "no-store",
+
+          signal:
+            controller.signal,
 
           body: JSON.stringify({
             secret,
@@ -98,6 +121,17 @@ async function fetchNaveUserContext(
       };
     }
 
+    /*
+     * IMPORTANTE:
+     *
+     * Uma resposta válida do backend pode ser:
+     *
+     * ok: true
+     * authorized: false
+     *
+     * Esse é um usuário realmente não autorizado,
+     * não uma falha técnica.
+     */
     if (
       !response.ok ||
       result.ok !== true
@@ -118,44 +152,85 @@ async function fetchNaveUserContext(
       reason:
         "BACKEND_UNAVAILABLE",
     };
+  } finally {
+    clearTimeout(
+      timeoutId
+    );
   }
 }
 
-/* =========================================================
-   CACHE CURTO — V0.10.3
-========================================================= */
+async function fetchNaveUserContext(
+  emailAutenticacao: string,
+  idGoogle: string
+): Promise<NaveUserContext> {
+  /*
+   * V0.11.7.1
+   *
+   * Não usamos unstable_cache aqui.
+   *
+   * O cache anterior armazenava inclusive respostas
+   * técnicas negativas por até 30 segundos. Assim,
+   * uma falha transitória do Apps Script podia ser
+   * reapresentada em várias navegações como se o
+   * usuário estivesse sem autorização.
+   *
+   * Fazemos até 3 tentativas curtas somente para
+   * falhas técnicas.
+   */
+  const delays =
+    [0, 300, 800];
 
-/*
- * O cache é separado pelos argumentos:
- *
- * - emailAutenticacao
- * - idGoogle
- *
- * Revalidação:
- * 30 segundos.
- *
- * Portanto, navegações sucessivas do mesmo usuário
- * não precisam consultar o Apps Script em toda página.
- */
-const getCachedNaveUserContext =
-  unstable_cache(
-    async (
-      emailAutenticacao: string,
-      idGoogle: string
-    ) =>
-      fetchNaveUserContext(
+  let lastResult:
+    NaveUserContext = {
+      ok: false,
+      authorized: false,
+      reason:
+        "BACKEND_UNAVAILABLE",
+    };
+
+  for (
+    let attempt = 0;
+    attempt <
+    delays.length;
+    attempt += 1
+  ) {
+    const delay =
+      delays[attempt];
+
+    if (delay > 0) {
+      await sleep(delay);
+    }
+
+    const result =
+      await fetchNaveUserContextOnce(
         emailAutenticacao,
         idGoogle
-      ),
+      );
 
-    [
-      "nave-user-context-v0103",
-    ],
+    lastResult =
+      result;
 
-    {
-      revalidate: 30,
+    /*
+     * Resposta válida:
+     * autorizada OU não autorizada.
+     * Não repetimos nesses casos.
+     */
+    if (result.ok === true) {
+      return result;
     }
-  );
+
+    if (
+      !result.reason ||
+      !TECHNICAL_REASONS.has(
+        result.reason
+      )
+    ) {
+      return result;
+    }
+  }
+
+  return lastResult;
+}
 
 /* =========================================================
    CONTEXTO AUTENTICADO
@@ -163,12 +238,6 @@ const getCachedNaveUserContext =
 
 export async function getNaveUserContext():
   Promise<NaveUserContext> {
-  /*
-   * auth() continua sendo executado
-   * em toda requisição protegida.
-   *
-   * NÃO colocamos a sessão no cache.
-   */
   const session =
     await auth();
 
@@ -193,7 +262,7 @@ export async function getNaveUserContext():
   const idGoogle =
     session.user.id.trim();
 
-  return getCachedNaveUserContext(
+  return fetchNaveUserContext(
     email,
     idGoogle
   );

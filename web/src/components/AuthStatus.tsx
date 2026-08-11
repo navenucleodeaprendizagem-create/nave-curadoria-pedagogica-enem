@@ -1,72 +1,34 @@
-"use client";
-
 import {
-  useState,
-} from "react";
-
-import {
+  auth,
   signIn,
   signOut,
-  useSession,
-} from "next-auth/react";
+} from "@/auth";
 
-export default function AuthStatus() {
-  const {
-    data: session,
-    status,
-  } = useSession();
-
-  const [
-    authAction,
-    setAuthAction,
-  ] =
-    useState<
-      "signin" |
-      "signout" |
-      null
-    >(null);
-
-  if (
-    status === "loading"
-  ) {
-    return (
-      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
-        Verificando usuário
-      </div>
-    );
-  }
+export default async function AuthStatus() {
+  const session =
+    await auth();
 
   if (!session?.user) {
     return (
-      <button
-        type="button"
-        disabled={
-          authAction !== null
-        }
-        onClick={() => {
-          setAuthAction(
-            "signin"
-          );
+      <form
+        action={async () => {
+          "use server";
 
-          void signIn(
+          await signIn(
             "google",
             {
-              redirectTo:
-                "/",
+              redirectTo: "/",
             }
-          ).catch(() => {
-            setAuthAction(
-              null
-            );
-          });
+          );
         }}
-        className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {authAction ===
-        "signin"
-          ? "Entrando..."
-          : "Entrar com Google"}
-      </button>
+        <button
+          type="submit"
+          className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+        >
+          Entrar com Google
+        </button>
+      </form>
     );
   }
 
@@ -83,48 +45,22 @@ export default function AuthStatus() {
         </div>
       </div>
 
-      <button
-        type="button"
-        disabled={
-          authAction !== null
-        }
-        onClick={() => {
-          setAuthAction(
-            "signout"
-          );
+      <form
+        action={async () => {
+          "use server";
 
-          /*
-           * Limpa o cache apenas de UX do NaveAccessGate
-           * antes de encerrar a sessão.
-           */
-          try {
-            window.sessionStorage.removeItem(
-              "nave-authorized-context-v01171"
-            );
-
-            window.sessionStorage.removeItem(
-              "nave-authorized-context-v01172"
-            );
-          } catch {
-            // Cache opcional.
-          }
-
-          void signOut({
-            redirectTo:
-              "/",
-          }).catch(() => {
-            setAuthAction(
-              null
-            );
+          await signOut({
+            redirectTo: "/",
           });
         }}
-        className="ml-2 text-xs font-semibold text-slate-500 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {authAction ===
-        "signout"
-          ? "Saindo..."
-          : "Sair"}
-      </button>
+        <button
+          type="submit"
+          className="ml-2 text-xs font-semibold text-slate-500 transition hover:text-slate-900"
+        >
+          Sair
+        </button>
+      </form>
     </div>
   );
 }

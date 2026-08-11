@@ -9,9 +9,12 @@ import {
 } from "react";
 
 import {
+  appendLocalSequenceItems,
   createLocalSequence,
+  getAllLocalSequences,
   getAllQuestions,
   type NaveQuestionRecord,
+  type NaveSequenceRecord,
 } from "@/lib/db/nave-db";
 
 import {
@@ -236,18 +239,48 @@ export default function QuestionBankSearchV01132() {
   const [sequenceSaveSuccess, setSequenceSaveSuccess] =
     useState("");
 
+  const [localSequences, setLocalSequences] =
+    useState<NaveSequenceRecord[]>([]);
+
+  const [sequenceDestination, setSequenceDestination] =
+    useState<"new" | "existing">("new");
+
+  const [existingSequenceId, setExistingSequenceId] =
+    useState("");
+
+  const [addingToSequence, setAddingToSequence] =
+    useState(false);
+
   useEffect(() => {
     async function load() {
       try {
         setLoading(true);
         setError("");
 
-        const localQuestions =
-          await getAllQuestions();
+        const [
+          localQuestions,
+          savedSequences,
+        ] =
+          await Promise.all([
+            getAllQuestions(),
+            getAllLocalSequences(),
+          ]);
 
         setQuestions(
           localQuestions
         );
+
+        setLocalSequences(
+          savedSequences
+        );
+
+        if (
+          savedSequences.length > 0
+        ) {
+          setExistingSequenceId(
+            savedSequences[0].id
+          );
+        }
       } catch (err) {
         setError(
           err instanceof Error
@@ -404,7 +437,7 @@ const rankedQuestions =
       .length;
 
   /* =======================================================
-     SELEÇÃO ATUAL — V0.11.5.1
+     SELEÇÃO ATUAL — V0.11.7.0
   ======================================================= */
 
   const selectedQuestions =
@@ -542,6 +575,17 @@ const rankedQuestions =
         `Sequência “${saved.sequence.titulo}” salva como rascunho com ${saved.sequence.quantidadeItens} questão(ões).`
       );
 
+      const refreshedSequences =
+        await getAllLocalSequences();
+
+      setLocalSequences(
+        refreshedSequences
+      );
+
+      setExistingSequenceId(
+        saved.sequence.id
+      );
+
       setSequenceTitle("");
       setSequenceDescription("");
       setSelectedQuestionIds([]);
@@ -553,6 +597,70 @@ const rankedQuestions =
       );
     } finally {
       setSavingSequence(false);
+    }
+  }
+
+  async function addSelectionToExistingSequence() {
+    if (!existingSequenceId) {
+      setSequenceSaveError(
+        "Escolha uma sequência existente."
+      );
+      setSequenceSaveSuccess("");
+      return;
+    }
+
+    if (
+      selectedQuestionIds.length === 0
+    ) {
+      setSequenceSaveError(
+        "Selecione pelo menos uma questão antes de adicionar."
+      );
+      setSequenceSaveSuccess("");
+      return;
+    }
+
+    try {
+      setAddingToSequence(true);
+      setSequenceSaveError("");
+      setSequenceSaveSuccess("");
+
+      const result =
+        await appendLocalSequenceItems(
+          existingSequenceId,
+          selectedQuestionIds
+        );
+
+      const added =
+        result.addedQuestionIds.length;
+
+      const skipped =
+        result.skippedQuestionIds.length;
+
+      const duplicateText =
+        skipped > 0
+          ? ` ${skipped} questão(ões) já estava(m) na sequência e não foi(ram) duplicada(s).`
+          : "";
+
+      setSequenceSaveSuccess(
+        `${added} questão(ões) adicionada(s) à sequência “${result.sequence.titulo}”.${duplicateText}`
+      );
+
+      const refreshedSequences =
+        await getAllLocalSequences();
+
+      setLocalSequences(
+        refreshedSequences
+      );
+
+      setSelectedQuestionIds([]);
+    } catch (err) {
+      setSequenceSaveError(
+        err instanceof Error
+          ? err.message
+          : "Falha ao adicionar questões à sequência."
+      );
+    } finally {
+      setAddingToSequence(false);
     }
   }
 
@@ -588,7 +696,7 @@ const rankedQuestions =
     <div className="space-y-6">
 
       {/* ===================================================
-          IDENTIDADE NAVE — V0.11.5.1
+          IDENTIDADE NAVE — V0.11.7.0
       =================================================== */}
 
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -627,7 +735,7 @@ const rankedQuestions =
               </span>
 
               <div className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800">
-                V0.11.5.1
+                V0.11.7.0
               </div>
             </div>
           </div>
@@ -926,77 +1034,202 @@ const rankedQuestions =
             )}
 
             <div className="rounded-2xl border border-teal-100 bg-teal-50/50 p-4">
-              <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr_auto] lg:items-end">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <label
-                    htmlFor="sequenceTitle"
-                    className="text-xs font-bold text-slate-700"
-                  >
-                    Nome da sequência
-                  </label>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-teal-700">
+                    Destino da seleção
+                  </p>
 
-                  <input
-                    id="sequenceTitle"
-                    type="text"
-                    value={sequenceTitle}
-                    onChange={(event) => {
-                      setSequenceTitle(
-                        event.target.value
+                  <p className="mt-1 text-xs text-slate-500">
+                    Crie uma nova sequência ou acrescente as questões selecionadas a uma sequência já salva.
+                  </p>
+                </div>
+
+                <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSequenceDestination(
+                        "new"
                       );
                       setSequenceSaveError("");
                       setSequenceSaveSuccess("");
                     }}
-                    placeholder="Ex.: Química orgânica — revisão"
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="sequenceDescription"
-                    className="text-xs font-bold text-slate-700"
+                    className={
+                      sequenceDestination ===
+                      "new"
+                        ? "rounded-lg bg-teal-700 px-3 py-2 text-xs font-bold text-white"
+                        : "rounded-lg px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+                    }
                   >
-                    Descrição
-                    <span className="ml-1 font-normal text-slate-400">
-                      opcional
-                    </span>
-                  </label>
+                    Nova sequência
+                  </button>
 
-                  <input
-                    id="sequenceDescription"
-                    type="text"
-                    value={sequenceDescription}
-                    onChange={(event) => {
-                      setSequenceDescription(
-                        event.target.value
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSequenceDestination(
+                        "existing"
                       );
                       setSequenceSaveError("");
                       setSequenceSaveSuccess("");
                     }}
-                    placeholder="Objetivo, turma ou observação pedagógica"
-                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                  />
+                    disabled={
+                      localSequences.length ===
+                      0
+                    }
+                    className={
+                      sequenceDestination ===
+                      "existing"
+                        ? "rounded-lg bg-teal-700 px-3 py-2 text-xs font-bold text-white"
+                        : "rounded-lg px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    }
+                  >
+                    Sequência existente
+                  </button>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    void saveCurrentSequence()
-                  }
-                  disabled={
-                    savingSequence ||
-                    selectedQuestions.length === 0
-                  }
-                  className="rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {savingSequence
-                    ? "Salvando..."
-                    : "Salvar sequência"}
-                </button>
               </div>
 
+              {sequenceDestination ===
+              "new" ? (
+                <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.4fr_auto] lg:items-end">
+                  <div>
+                    <label
+                      htmlFor="sequenceTitle"
+                      className="text-xs font-bold text-slate-700"
+                    >
+                      Nome da sequência
+                    </label>
+
+                    <input
+                      id="sequenceTitle"
+                      type="text"
+                      value={sequenceTitle}
+                      onChange={(event) => {
+                        setSequenceTitle(
+                          event.target.value
+                        );
+                        setSequenceSaveError("");
+                        setSequenceSaveSuccess("");
+                      }}
+                      placeholder="Ex.: Química orgânica — revisão"
+                      className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="sequenceDescription"
+                      className="text-xs font-bold text-slate-700"
+                    >
+                      Descrição
+                      <span className="ml-1 font-normal text-slate-400">
+                        opcional
+                      </span>
+                    </label>
+
+                    <input
+                      id="sequenceDescription"
+                      type="text"
+                      value={sequenceDescription}
+                      onChange={(event) => {
+                        setSequenceDescription(
+                          event.target.value
+                        );
+                        setSequenceSaveError("");
+                        setSequenceSaveSuccess("");
+                      }}
+                      placeholder="Objetivo, turma ou observação pedagógica"
+                      className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void saveCurrentSequence()
+                    }
+                    disabled={
+                      savingSequence ||
+                      selectedQuestions.length ===
+                        0
+                    }
+                    className="rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingSequence
+                      ? "Salvando..."
+                      : "Criar sequência"}
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+                  <div>
+                    <label
+                      htmlFor="existingSequence"
+                      className="text-xs font-bold text-slate-700"
+                    >
+                      Sequência de destino
+                    </label>
+
+                    <select
+                      id="existingSequence"
+                      value={
+                        existingSequenceId
+                      }
+                      onChange={(event) => {
+                        setExistingSequenceId(
+                          event.target.value
+                        );
+                        setSequenceSaveError("");
+                        setSequenceSaveSuccess("");
+                      }}
+                      className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                    >
+                      {localSequences.map(
+                        (sequence) => (
+                          <option
+                            key={
+                              sequence.id
+                            }
+                            value={
+                              sequence.id
+                            }
+                          >
+                            {
+                              sequence.titulo
+                            }{" "}
+                            —{" "}
+                            {
+                              sequence.quantidadeItens
+                            } questão(ões)
+                          </option>
+                        )
+                      )}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void addSelectionToExistingSequence()
+                    }
+                    disabled={
+                      addingToSequence ||
+                      selectedQuestions.length ===
+                        0 ||
+                      !existingSequenceId
+                    }
+                    className="rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {addingToSequence
+                      ? "Adicionando..."
+                      : "Adicionar à sequência"}
+                  </button>
+                </div>
+              )}
+
               <p className="mt-3 text-xs leading-5 text-teal-900/70">
-                A sequência será gravada como rascunho no banco local deste navegador, preservando a ordem definida acima.
+                A ordem atual da seleção será preservada. Ao adicionar a uma sequência existente, as novas questões entram ao final e itens já presentes não são duplicados.
               </p>
             </div>
           </div>

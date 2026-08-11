@@ -1026,6 +1026,127 @@ export async function replaceLocalSequenceItems(
 
 
 /* ---------------------------------------------------------
+   ADICIONAR ITENS A UMA SEQUÊNCIA EXISTENTE — V0.11.7.0
+--------------------------------------------------------- */
+
+export interface AppendLocalSequenceItemsResult {
+  sequence: NaveSequenceRecord;
+  addedQuestionIds: string[];
+  skippedQuestionIds: string[];
+}
+
+export async function appendLocalSequenceItems(
+  sequenceId: string,
+  questionIds: string[]
+): Promise<AppendLocalSequenceItemsResult> {
+  const normalizedIds =
+    questionIds
+      .map((id) =>
+        String(id ?? "").trim()
+      )
+      .filter(Boolean);
+
+  if (normalizedIds.length === 0) {
+    throw new Error(
+      "Selecione pelo menos uma questão para adicionar."
+    );
+  }
+
+  const sequence =
+    await getLocalSequence(
+      sequenceId
+    );
+
+  if (!sequence) {
+    throw new Error(
+      "Sequência não encontrada."
+    );
+  }
+
+  const currentItems =
+    await getLocalSequenceItems(
+      sequenceId
+    );
+
+  const currentQuestionIds =
+    currentItems
+      .sort(
+        (a, b) =>
+          a.position -
+          b.position
+      )
+      .map(
+        (item) =>
+          item.questionId
+      );
+
+  const currentSet =
+    new Set(
+      currentQuestionIds
+    );
+
+  const addedQuestionIds:
+    string[] = [];
+
+  const skippedQuestionIds:
+    string[] = [];
+
+  const seenIncoming =
+    new Set<string>();
+
+  for (const questionId of normalizedIds) {
+    if (
+      currentSet.has(questionId) ||
+      seenIncoming.has(questionId)
+    ) {
+      skippedQuestionIds.push(
+        questionId
+      );
+      continue;
+    }
+
+    seenIncoming.add(
+      questionId
+    );
+
+    addedQuestionIds.push(
+      questionId
+    );
+  }
+
+  if (
+    addedQuestionIds.length > 0
+  ) {
+    await replaceLocalSequenceItems(
+      sequenceId,
+      [
+        ...currentQuestionIds,
+        ...addedQuestionIds,
+      ]
+    );
+  }
+
+  const updatedSequence =
+    await getLocalSequence(
+      sequenceId
+    );
+
+  if (!updatedSequence) {
+    throw new Error(
+      "Não foi possível confirmar a sequência após a atualização."
+    );
+  }
+
+  return {
+    sequence:
+      updatedSequence,
+    addedQuestionIds,
+    skippedQuestionIds,
+  };
+}
+
+
+/* ---------------------------------------------------------
    EXCLUSÃO
 --------------------------------------------------------- */
 

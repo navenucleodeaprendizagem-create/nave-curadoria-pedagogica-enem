@@ -11,6 +11,8 @@ import {
   getAllLocalSequences,
   getAllQuestions,
   getLocalSequenceItems,
+  replaceLocalSequenceItems,
+  updateLocalSequenceMetadata,
   type NaveQuestionRecord,
   type NaveSequenceItemRecord,
   type NaveSequenceRecord,
@@ -124,6 +126,38 @@ export default function SequenciasClient() {
   ] =
     useState("");
 
+  const [
+    editingSequenceId,
+    setEditingSequenceId,
+  ] =
+    useState<string | null>(
+      null
+    );
+
+  const [
+    editTitle,
+    setEditTitle,
+  ] =
+    useState("");
+
+  const [
+    editDescription,
+    setEditDescription,
+  ] =
+    useState("");
+
+  const [
+    editQuestionIds,
+    setEditQuestionIds,
+  ] =
+    useState<string[]>([]);
+
+  const [
+    savingEdit,
+    setSavingEdit,
+  ] =
+    useState(false);
+
   const loadSequences =
     useCallback(async () => {
       try {
@@ -236,6 +270,208 @@ export default function SequenciasClient() {
     }
   }
 
+  async function startEditing(
+    sequence: NaveSequenceRecord
+  ) {
+    try {
+      setActionMessage("");
+      setLoadingSequenceId(
+        sequence.id
+      );
+
+      const items =
+        sequenceItems[
+          sequence.id
+        ] ??
+        (await getLocalSequenceItems(
+          sequence.id
+        ));
+
+      setSequenceItems(
+        (current) => ({
+          ...current,
+          [sequence.id]: items,
+        })
+      );
+
+      setExpandedSequenceId(
+        sequence.id
+      );
+
+      setEditingSequenceId(
+        sequence.id
+      );
+
+      setEditTitle(
+        sequence.titulo
+      );
+
+      setEditDescription(
+        sequence.descricao ?? ""
+      );
+
+      setEditQuestionIds(
+        items
+          .sort(
+            (a, b) =>
+              a.position -
+              b.position
+          )
+          .map(
+            (item) =>
+              item.questionId
+          )
+      );
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error
+          ? error.message
+          : "Falha ao iniciar a edição da sequência."
+      );
+    } finally {
+      setLoadingSequenceId(
+        null
+      );
+    }
+  }
+
+  function cancelEditing() {
+    setEditingSequenceId(
+      null
+    );
+    setEditTitle("");
+    setEditDescription("");
+    setEditQuestionIds([]);
+    setActionMessage("");
+  }
+
+  function moveEditQuestion(
+    index: number,
+    direction: -1 | 1
+  ) {
+    setEditQuestionIds(
+      (current) => {
+        const targetIndex =
+          index + direction;
+
+        if (
+          targetIndex < 0 ||
+          targetIndex >=
+            current.length
+        ) {
+          return current;
+        }
+
+        const next = [
+          ...current,
+        ];
+
+        [
+          next[index],
+          next[targetIndex],
+        ] = [
+          next[targetIndex],
+          next[index],
+        ];
+
+        return next;
+      }
+    );
+  }
+
+  function removeEditQuestion(
+    questionId: string
+  ) {
+    setEditQuestionIds(
+      (current) =>
+        current.filter(
+          (id) =>
+            id !== questionId
+        )
+    );
+  }
+
+  async function saveEditing(
+    sequenceId: string
+  ) {
+    const titulo =
+      editTitle.trim();
+
+    if (!titulo) {
+      setActionMessage(
+        "Informe um nome para a sequência."
+      );
+      return;
+    }
+
+    if (
+      editQuestionIds.length === 0
+    ) {
+      setActionMessage(
+        "A sequência precisa conter pelo menos uma questão."
+      );
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      setActionMessage("");
+
+      await updateLocalSequenceMetadata(
+        sequenceId,
+        {
+          titulo,
+          descricao:
+            editDescription.trim(),
+        }
+      );
+
+      await replaceLocalSequenceItems(
+        sequenceId,
+        editQuestionIds
+      );
+
+      const refreshedItems =
+        await getLocalSequenceItems(
+          sequenceId
+        );
+
+      setSequenceItems(
+        (current) => ({
+          ...current,
+          [sequenceId]:
+            refreshedItems,
+        })
+      );
+
+      setEditingSequenceId(
+        null
+      );
+
+      setEditTitle("");
+      setEditDescription("");
+      setEditQuestionIds([]);
+
+      await loadSequences();
+
+      setExpandedSequenceId(
+        sequenceId
+      );
+
+      setActionMessage(
+        "Alterações da sequência salvas com sucesso."
+      );
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error
+          ? error.message
+          : "Falha ao salvar as alterações da sequência."
+      );
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   async function handleDelete(
     sequence: NaveSequenceRecord
   ) {
@@ -308,7 +544,7 @@ export default function SequenciasClient() {
             </h2>
 
             <span className="rounded-full border border-teal-200 bg-white px-2.5 py-1 text-[10px] font-bold text-teal-800">
-              V0.11.5.3
+              V0.11.6.0
             </span>
           </div>
 
@@ -457,6 +693,27 @@ export default function SequenciasClient() {
                       <button
                         type="button"
                         onClick={() =>
+                          void startEditing(
+                            sequence
+                          )
+                        }
+                        disabled={
+                          loadingSequenceId ===
+                            sequence.id ||
+                          editingSequenceId ===
+                            sequence.id
+                        }
+                        className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {editingSequenceId ===
+                        sequence.id
+                          ? "Editando"
+                          : "Editar"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
                           void handleDelete(
                             sequence
                           )
@@ -470,120 +727,348 @@ export default function SequenciasClient() {
 
                   {expanded ? (
                     <div className="mt-5 border-t border-slate-200 pt-5">
-                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
-                        Ordem pedagógica
-                      </p>
+                      {editingSequenceId ===
+                      sequence.id ? (
+                        <div>
+                          <div className="grid gap-4 lg:grid-cols-2">
+                            <div>
+                              <label className="text-xs font-bold text-slate-700">
+                                Nome da sequência
+                              </label>
 
-                      {items.length ===
-                      0 ? (
-                        <p className="mt-3 text-sm text-slate-500">
-                          Nenhum item encontrado nesta sequência.
-                        </p>
-                      ) : (
-                        <div className="mt-3 space-y-2">
-                          {items.map(
-                            (
-                              item
-                            ) => {
-                              const question =
-                                questionsById[
-                                  item.questionId
-                                ];
+                              <input
+                                type="text"
+                                value={
+                                  editTitle
+                                }
+                                onChange={(
+                                  event
+                                ) =>
+                                  setEditTitle(
+                                    event
+                                      .target
+                                      .value
+                                  )
+                                }
+                                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                              />
+                            </div>
 
-                              return (
-                                <div
-                                  key={
-                                    item.id
-                                  }
-                                  className="rounded-2xl border border-slate-200 bg-white p-4"
-                                >
-                                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-                                    <span className="inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-teal-100 px-2 text-xs font-bold text-teal-800">
-                                      {
-                                        item.position
-                                      }
-                                    </span>
+                            <div>
+                              <label className="text-xs font-bold text-slate-700">
+                                Descrição
+                              </label>
 
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <span className="font-mono text-xs font-bold text-teal-700">
+                              <input
+                                type="text"
+                                value={
+                                  editDescription
+                                }
+                                onChange={(
+                                  event
+                                ) =>
+                                  setEditDescription(
+                                    event
+                                      .target
+                                      .value
+                                  )
+                                }
+                                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                                Editar ordem pedagógica
+                              </p>
+
+                              <p className="mt-1 text-xs text-slate-500">
+                                {
+                                  editQuestionIds.length
+                                }{" "}
+                                questão(ões) na sequência
+                              </p>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={
+                                  cancelEditing
+                                }
+                                disabled={
+                                  savingEdit
+                                }
+                                className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+                              >
+                                Cancelar
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void saveEditing(
+                                    sequence.id
+                                  )
+                                }
+                                disabled={
+                                  savingEdit ||
+                                  editQuestionIds.length ===
+                                    0
+                                }
+                                className="rounded-xl bg-teal-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {savingEdit
+                                  ? "Salvando..."
+                                  : "Salvar alterações"}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 space-y-3">
+                            {editQuestionIds.map(
+                              (
+                                questionId,
+                                index
+                              ) => {
+                                const question =
+                                  questionsById[
+                                    questionId
+                                  ];
+
+                                return (
+                                  <div
+                                    key={
+                                      questionId
+                                    }
+                                    className="rounded-2xl border border-slate-200 bg-white p-4"
+                                  >
+                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                      <div className="flex min-w-0 items-start gap-3">
+                                        <span className="inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-teal-100 px-2 text-xs font-bold text-teal-800">
                                           {
-                                            item.questionId
+                                            index +
+                                            1
                                           }
                                         </span>
 
-                                        {question ? (
-                                          <>
-                                            <span className="text-xs text-slate-400">
+                                        <div className="min-w-0">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <span className="font-mono text-xs font-bold text-teal-700">
                                               {
-                                                question.competencia
+                                                questionId
                                               }
                                             </span>
 
-                                            <span className="text-xs text-slate-400">
-                                              {
-                                                question.habilidade
-                                              }
-                                            </span>
-                                          </>
-                                        ) : null}
-                                      </div>
+                                            {question ? (
+                                              <>
+                                                <span className="text-xs text-slate-400">
+                                                  {
+                                                    question.competencia
+                                                  }
+                                                </span>
 
-                                      {question ? (
-                                        <>
-                                          <h4 className="mt-2 text-sm font-bold text-slate-950">
-                                            {
-                                              question.objetoPrincipal ||
-                                              "Objeto do conhecimento não informado"
-                                            }
-                                          </h4>
-
-                                          <div className="mt-2 flex flex-wrap gap-2">
-                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                                              {
-                                                question.dificuldadeRotulo
-                                              }
-                                            </span>
-
-                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
-                                              {
-                                                question.ano
-                                              }
-                                              {" · "}
-                                              {
-                                                question.edicao
-                                              }
-                                            </span>
-
-                                            <span className="rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-800">
-                                              {
-                                                question.funcaoPedagogica ||
-                                                "Função pedagógica não informada"
-                                              }
-                                            </span>
+                                                <span className="text-xs text-slate-400">
+                                                  {
+                                                    question.habilidade
+                                                  }
+                                                </span>
+                                              </>
+                                            ) : null}
                                           </div>
 
-                                          <p className="mt-3 text-sm leading-6 text-slate-600">
-                                            {
-                                              question.trechoInicial ||
-                                              "Trecho inicial não disponível."
-                                            }
-                                          </p>
-                                        </>
-                                      ) : (
-                                        <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-                                          <p className="text-xs font-semibold text-amber-800">
-                                            Questão não localizada no banco local.
+                                          <p className="mt-1 text-sm font-bold text-slate-950">
+                                            {question?.objetoPrincipal ||
+                                              "Questão não localizada no banco local"}
                                           </p>
                                         </div>
-                                      )}
+                                      </div>
+
+                                      <div className="flex shrink-0 flex-wrap gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            moveEditQuestion(
+                                              index,
+                                              -1
+                                            )
+                                          }
+                                          disabled={
+                                            index ===
+                                            0
+                                          }
+                                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                          ↑ Subir
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            moveEditQuestion(
+                                              index,
+                                              1
+                                            )
+                                          }
+                                          disabled={
+                                            index ===
+                                            editQuestionIds.length -
+                                              1
+                                          }
+                                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                          ↓ Descer
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            removeEditQuestion(
+                                              questionId
+                                            )
+                                          }
+                                          disabled={
+                                            editQuestionIds.length <=
+                                            1
+                                          }
+                                          title={
+                                            editQuestionIds.length <=
+                                            1
+                                              ? "A sequência precisa manter pelo menos uma questão."
+                                              : undefined
+                                          }
+                                          className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                          Remover
+                                        </button>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            }
-                          )}
+                                );
+                              }
+                            )}
+                          </div>
                         </div>
+                      ) : (
+                        <>
+                          <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                            Ordem pedagógica
+                          </p>
+
+                          {items.length ===
+                          0 ? (
+                            <p className="mt-3 text-sm text-slate-500">
+                              Nenhum item encontrado nesta sequência.
+                            </p>
+                          ) : (
+                            <div className="mt-3 space-y-2">
+                              {items.map(
+                                (
+                                  item
+                                ) => {
+                                  const question =
+                                    questionsById[
+                                      item.questionId
+                                    ];
+
+                                  return (
+                                    <div
+                                      key={
+                                        item.id
+                                      }
+                                      className="rounded-2xl border border-slate-200 bg-white p-4"
+                                    >
+                                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+                                        <span className="inline-flex h-8 min-w-8 shrink-0 items-center justify-center rounded-full bg-teal-100 px-2 text-xs font-bold text-teal-800">
+                                          {
+                                            item.position
+                                          }
+                                        </span>
+
+                                        <div className="min-w-0 flex-1">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <span className="font-mono text-xs font-bold text-teal-700">
+                                              {
+                                                item.questionId
+                                              }
+                                            </span>
+
+                                            {question ? (
+                                              <>
+                                                <span className="text-xs text-slate-400">
+                                                  {
+                                                    question.competencia
+                                                  }
+                                                </span>
+
+                                                <span className="text-xs text-slate-400">
+                                                  {
+                                                    question.habilidade
+                                                  }
+                                                </span>
+                                              </>
+                                            ) : null}
+                                          </div>
+
+                                          {question ? (
+                                            <>
+                                              <h4 className="mt-2 text-sm font-bold text-slate-950">
+                                                {
+                                                  question.objetoPrincipal ||
+                                                  "Objeto do conhecimento não informado"
+                                                }
+                                              </h4>
+
+                                              <div className="mt-2 flex flex-wrap gap-2">
+                                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                                                  {
+                                                    question.dificuldadeRotulo
+                                                  }
+                                                </span>
+
+                                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                                                  {
+                                                    question.ano
+                                                  }
+                                                  {" · "}
+                                                  {
+                                                    question.edicao
+                                                  }
+                                                </span>
+
+                                                <span className="rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-800">
+                                                  {
+                                                    question.funcaoPedagogica ||
+                                                    "Função pedagógica não informada"
+                                                  }
+                                                </span>
+                                              </div>
+
+                                              <p className="mt-3 text-sm leading-6 text-slate-600">
+                                                {
+                                                  question.trechoInicial ||
+                                                  "Trecho inicial não disponível."
+                                                }
+                                              </p>
+                                            </>
+                                          ) : (
+                                            <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                                              <p className="text-xs font-semibold text-amber-800">
+                                                Questão não localizada no banco local.
+                                              </p>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                }
+                              )}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   ) : null}

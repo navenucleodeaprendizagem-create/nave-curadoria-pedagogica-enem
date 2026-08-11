@@ -738,6 +738,124 @@ export async function getLocalSequenceWithItems(
 
 
 /* ---------------------------------------------------------
+   ATUALIZAÇÃO DE METADADOS
+--------------------------------------------------------- */
+
+export async function updateLocalSequenceMetadata(
+  sequenceId: string,
+  updates: {
+    titulo: string;
+    descricao?: string;
+  }
+): Promise<NaveSequenceRecord> {
+  const titulo =
+    String(updates.titulo ?? "").trim();
+
+  const descricao =
+    String(updates.descricao ?? "").trim();
+
+  if (!titulo) {
+    throw new Error(
+      "Informe um nome para a sequência."
+    );
+  }
+
+  const db =
+    await openNaveDb();
+
+  return new Promise(
+    (resolve, reject) => {
+      const transaction =
+        db.transaction(
+          STORES.SEQUENCES,
+          "readwrite"
+        );
+
+      const store =
+        transaction.objectStore(
+          STORES.SEQUENCES
+        );
+
+      const request =
+        store.get(sequenceId);
+
+      let updated:
+        | NaveSequenceRecord
+        | undefined;
+
+      request.onsuccess =
+        () => {
+          const current =
+            request.result as
+              | NaveSequenceRecord
+              | undefined;
+
+          if (!current) {
+            transaction.abort();
+            return;
+          }
+
+          updated = {
+            ...current,
+            titulo,
+            descricao,
+            updatedAt:
+              new Date().toISOString(),
+          };
+
+          store.put(updated);
+        };
+
+      request.onerror =
+        () => {
+          transaction.abort();
+        };
+
+      transaction.oncomplete =
+        () => {
+          db.close();
+
+          if (!updated) {
+            reject(
+              new Error(
+                "Sequência não encontrada."
+              )
+            );
+            return;
+          }
+
+          resolve(updated);
+        };
+
+      transaction.onerror =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "Falha ao atualizar os dados da sequência."
+              )
+          );
+        };
+
+      transaction.onabort =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "A atualização da sequência foi interrompida."
+              )
+          );
+        };
+    }
+  );
+}
+
+
+/* ---------------------------------------------------------
    ATUALIZAÇÃO DA ORDEM
 --------------------------------------------------------- */
 

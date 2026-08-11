@@ -11,7 +11,9 @@ import {
 import { SYSTEM_VERSION } from "@/lib/system-version";
 
 import {
+  createEditorialJobFromSequence,
   deleteLocalSequence,
+  getAllEditorialJobs,
   getAllLocalSequences,
   getAllQuestions,
   getLocalSequenceItems,
@@ -162,6 +164,22 @@ export default function SequenciasClient() {
   ] =
     useState(false);
 
+  const [
+    sendingEditorialSequenceId,
+    setSendingEditorialSequenceId,
+  ] =
+    useState<string | null>(
+      null
+    );
+
+  const [
+    activeEditorialSequenceIds,
+    setActiveEditorialSequenceIds,
+  ] =
+    useState<Set<string>>(
+      new Set()
+    );
+
   const loadSequences =
     useCallback(async () => {
       try {
@@ -176,10 +194,12 @@ export default function SequenciasClient() {
         const [
           sequences,
           questions,
+          editorialJobs,
         ] =
           await Promise.all([
             getAllLocalSequences(),
             getAllQuestions(),
+            getAllEditorialJobs(),
           ]);
 
         const nextQuestionsById =
@@ -194,6 +214,23 @@ export default function SequenciasClient() {
 
         setQuestionsById(
           nextQuestionsById
+        );
+
+        setActiveEditorialSequenceIds(
+          new Set(
+            editorialJobs
+              .filter(
+                (job) =>
+                  job.status ===
+                    "aguardando" ||
+                  job.status ===
+                    "em_producao"
+              )
+              .map(
+                (job) =>
+                  job.sequenceId
+              )
+          )
         );
 
         setState({
@@ -476,6 +513,47 @@ export default function SequenciasClient() {
     }
   }
 
+  async function handleSendToEditorial(
+    sequence: NaveSequenceRecord
+  ) {
+    const confirmed =
+      window.confirm(
+        `Enviar a sequência “${sequence.titulo}” para editoração? Será criado um snapshot com a ordem atual das questões.`
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setSendingEditorialSequenceId(
+        sequence.id
+      );
+
+      setActionMessage("");
+
+      await createEditorialJobFromSequence(
+        sequence.id
+      );
+
+      setActionMessage(
+        `Sequência “${sequence.titulo}” enviada para editoração.`
+      );
+
+      await loadSequences();
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error
+          ? error.message
+          : "Falha ao enviar a sequência para editoração."
+      );
+    } finally {
+      setSendingEditorialSequenceId(
+        null
+      );
+    }
+  }
+
   async function handleDelete(
     sequence: NaveSequenceRecord
   ) {
@@ -565,6 +643,13 @@ export default function SequenciasClient() {
             Adicionar questões
           </Link>
 
+          <Link
+            href="/editoracao"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
+          >
+            Editoração
+          </Link>
+
           <span className="rounded-full bg-teal-50 px-3 py-1.5 text-sm font-bold text-teal-800">
             {sequences.length} sequência(s)
           </span>
@@ -642,6 +727,11 @@ export default function SequenciasClient() {
                 sequenceItems[
                   sequence.id
                 ] ?? [];
+
+              const inEditorial =
+                activeEditorialSequenceIds.has(
+                  sequence.id
+                );
 
               return (
                 <article
@@ -727,6 +817,28 @@ export default function SequenciasClient() {
                         sequence.id
                           ? "Editando"
                           : "Editar"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleSendToEditorial(
+                            sequence
+                          )
+                        }
+                        disabled={
+                          inEditorial ||
+                          sendingEditorialSequenceId ===
+                            sequence.id
+                        }
+                        className="rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {sendingEditorialSequenceId ===
+                        sequence.id
+                          ? "Enviando..."
+                          : inEditorial
+                            ? "Na editoração"
+                            : "Enviar à editoração"}
                       </button>
 
                       <button

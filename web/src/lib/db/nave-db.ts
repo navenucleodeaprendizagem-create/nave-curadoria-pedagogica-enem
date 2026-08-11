@@ -1,5 +1,5 @@
 const DB_NAME = "nave-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export const STORES = {
   META: "meta",
@@ -8,6 +8,7 @@ export const STORES = {
   SEQUENCE_ITEMS: "sequence_items",
   VALIDATIONS: "validations",
   REPORTS: "reports",
+  EDITORIAL_JOBS: "editorial_jobs",
   SYNC_QUEUE: "sync_queue",
 } as const;
 
@@ -82,6 +83,12 @@ export function openNaveDb(): Promise<IDBDatabase> {
       createStoreIfMissing(
         db,
         STORES.REPORTS,
+        { keyPath: "id" }
+      );
+
+      createStoreIfMissing(
+        db,
+        STORES.EDITORIAL_JOBS,
         { keyPath: "id" }
       );
 
@@ -1233,6 +1240,318 @@ export async function deleteLocalSequence(
             transaction.error ??
               new Error(
                 "A exclusão da sequência foi interrompida."
+              )
+          );
+        };
+    }
+  );
+}
+
+
+
+/* =========================================================
+   EDITORAÇÃO — V0.11.10.0
+   Cada envio gera um snapshot independente da sequência.
+========================================================= */
+
+export type NaveEditorialJobStatus =
+  | "aguardando"
+  | "em_producao"
+  | "concluido"
+  | "cancelado";
+
+export interface NaveEditorialJob {
+  id: string;
+  sequenceId: string;
+  titulo: string;
+  descricao: string;
+  questionIds: string[];
+  quantidadeItens: number;
+  status: NaveEditorialJobStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getAllEditorialJobs(): Promise<
+  NaveEditorialJob[]
+> {
+  const db = await openNaveDb();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(
+      STORES.EDITORIAL_JOBS,
+      "readonly"
+    );
+
+    const store = transaction.objectStore(
+      STORES.EDITORIAL_JOBS
+    );
+
+    const request = store.getAll();
+
+    request.onsuccess = () => {
+      const jobs =
+        request.result as NaveEditorialJob[];
+
+      db.close();
+
+      resolve(
+        jobs.sort((a, b) =>
+          b.createdAt.localeCompare(
+            a.createdAt
+          )
+        )
+      );
+    };
+
+    request.onerror = () => {
+      db.close();
+
+      reject(
+        request.error ??
+          new Error(
+            "Falha ao consultar a fila de editoração."
+          )
+      );
+    };
+  });
+}
+
+export async function createEditorialJobFromSequence(
+  sequenceId: string
+): Promise<NaveEditorialJob> {
+  const sequence =
+    await getLocalSequence(
+      sequenceId
+    );
+
+  if (!sequence) {
+    throw new Error(
+      "Sequência não encontrada."
+    );
+  }
+
+  if (
+    sequence.status ===
+    "arquivada"
+  ) {
+    throw new Error(
+      "Uma sequência arquivada não pode ser enviada para editoração."
+    );
+  }
+
+  const items =
+    await getLocalSequenceItems(
+      sequenceId
+    );
+
+  if (items.length === 0) {
+    throw new Error(
+      "A sequência não possui questões para enviar à editoração."
+    );
+  }
+
+  const existingJobs =
+    await getAllEditorialJobs();
+
+  const activeJob =
+    existingJobs.find(
+      (job) =>
+        job.sequenceId ===
+          sequenceId &&
+        (
+          job.status ===
+            "aguardando" ||
+          job.status ===
+            "em_producao"
+        )
+    );
+
+  if (activeJob) {
+    throw new Error(
+      "Esta sequência já possui um envio ativo na editoração."
+    );
+  }
+
+  const now =
+    new Date().toISOString();
+
+  const job:
+    NaveEditorialJob = {
+      id: crypto.randomUUID(),
+      sequenceId,
+      titulo: sequence.titulo,
+      descricao:
+        sequence.descricao ?? "",
+      questionIds:
+        items
+          .sort(
+            (a, b) =>
+              a.position -
+              b.position
+          )
+          .map(
+            (item) =>
+              item.questionId
+          ),
+      quantidadeItens:
+        items.length,
+      status: "aguardando",
+      createdAt: now,
+      updatedAt: now,
+    };
+
+  const db =
+    await openNaveDb();
+
+  await new Promise<void>(
+    (resolve, reject) => {
+      const transaction =
+        db.transaction(
+          [
+            STORES.EDITORIAL_JOBS,
+            STORES.SEQUENCES,
+          ],
+          "readwrite"
+        );
+
+      const editorialStore =
+        transaction.objectStore(
+          STORES.EDITORIAL_JOBS
+        );
+
+      const sequenceStore =
+        transaction.objectStore(
+          STORES.SEQUENCES
+        );
+
+      editorialStore.put(job);
+
+      sequenceStore.put({
+        ...sequence,
+        status: "pronta",
+        updatedAt: now,
+      } satisfies NaveSequenceRecord);
+
+      transaction.oncomplete =
+        () => {
+          db.close();
+          resolve();
+        };
+
+      transaction.onerror =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "Falha ao enviar a sequência para editoração."
+              )
+          );
+        };
+
+      transaction.onabort =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "O envio para editoração foi interrompido."
+              )
+          );
+        };
+    }
+  );
+
+  return job;
+}
+
+export async function updateEditorialJobStatus(
+  id: string,
+  status: NaveEditorialJobStatus
+): Promise<NaveEditorialJob> {
+  const db =
+    await openNaveDb();
+
+  return new Promise(
+    (resolve, reject) => {
+      const transaction =
+        db.transaction(
+          STORES.EDITORIAL_JOBS,
+          "readwrite"
+        );
+
+      const store =
+        transaction.objectStore(
+          STORES.EDITORIAL_JOBS
+        );
+
+      const request =
+        store.get(id);
+
+      request.onsuccess =
+        () => {
+          const current =
+            request.result as
+              | NaveEditorialJob
+              | undefined;
+
+          if (!current) {
+            transaction.abort();
+
+            reject(
+              new Error(
+                "Envio editorial não encontrado."
+              )
+            );
+
+            return;
+          }
+
+          const updated:
+            NaveEditorialJob = {
+            ...current,
+            status,
+            updatedAt:
+              new Date().toISOString(),
+          };
+
+          store.put(updated);
+
+          transaction.oncomplete =
+            () => {
+              db.close();
+              resolve(updated);
+            };
+        };
+
+      request.onerror =
+        () => {
+          transaction.abort();
+        };
+
+      transaction.onerror =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "Falha ao atualizar o status editorial."
+              )
+          );
+        };
+
+      transaction.onabort =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "A atualização editorial foi interrompida."
               )
           );
         };

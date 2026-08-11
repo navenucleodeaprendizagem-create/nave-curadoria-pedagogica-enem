@@ -217,6 +217,9 @@ export default function QuestionBankSearchV01132() {
   const [error, setError] =
     useState("");
 
+  const [selectedQuestionIds, setSelectedQuestionIds] =
+    useState<string[]>([]);
+
   useEffect(() => {
     async function load() {
       try {
@@ -385,6 +388,97 @@ const rankedQuestions =
       .length;
 
   /* =======================================================
+     SELEÇÃO ATUAL — V0.11.5.0
+  ======================================================= */
+
+  const selectedQuestions =
+    useMemo(() => {
+      const byId =
+        new Map(
+          questions.map(
+            (question) => [
+              question.id,
+              question,
+            ]
+          )
+        );
+
+      return selectedQuestionIds
+        .map((id) => byId.get(id))
+        .filter(
+          (
+            question
+          ): question is NaveQuestionRecord =>
+            Boolean(question)
+        );
+    }, [
+      questions,
+      selectedQuestionIds,
+    ]);
+
+  function isSelected(
+    questionId: string
+  ) {
+    return selectedQuestionIds.includes(
+      questionId
+    );
+  }
+
+  function toggleQuestionSelection(
+    questionId: string
+  ) {
+    setSelectedQuestionIds(
+      (current) =>
+        current.includes(questionId)
+          ? current.filter(
+              (id) =>
+                id !== questionId
+            )
+          : [
+              ...current,
+              questionId,
+            ]
+    );
+  }
+
+  function clearSelection() {
+    setSelectedQuestionIds([]);
+  }
+
+  function moveSelectedQuestion(
+    index: number,
+    direction: -1 | 1
+  ) {
+    setSelectedQuestionIds(
+      (current) => {
+        const targetIndex =
+          index + direction;
+
+        if (
+          targetIndex < 0 ||
+          targetIndex >= current.length
+        ) {
+          return current;
+        }
+
+        const next = [
+          ...current,
+        ];
+
+        [
+          next[index],
+          next[targetIndex],
+        ] = [
+          next[targetIndex],
+          next[index],
+        ];
+
+        return next;
+      }
+    );
+  }
+
+  /* =======================================================
      ESTADOS
   ======================================================= */
 
@@ -416,7 +510,7 @@ const rankedQuestions =
     <div className="space-y-6">
 
       {/* ===================================================
-          IDENTIDADE NAVE — V0.11.4.1
+          IDENTIDADE NAVE — V0.11.5.0
       =================================================== */}
 
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -444,7 +538,7 @@ const rankedQuestions =
                 </h1>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Seleção, validação e organização pedagógica de questões do ENEM.
+                  Seleção, organização e preparação de sequências pedagógicas do ENEM.
                 </p>
               </div>
             </div>
@@ -455,7 +549,7 @@ const rankedQuestions =
               </span>
 
               <div className="rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800">
-                V0.11.4.1
+                V0.11.5.0
               </div>
             </div>
           </div>
@@ -597,6 +691,160 @@ const rankedQuestions =
       </section>
 
       {/* ===================================================
+          SELEÇÃO ATUAL
+      =================================================== */}
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-teal-700">
+              Construção da sequência
+            </p>
+
+            <h2 className="mt-1 text-lg font-bold text-slate-950">
+              Seleção atual
+            </h2>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Escolha questões nos resultados e organize a ordem pedagógica antes de salvar a sequência.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-teal-50 px-3 py-1.5 text-sm font-bold text-teal-800">
+              {selectedQuestions.length} selecionada(s)
+            </span>
+
+            <button
+              type="button"
+              onClick={clearSelection}
+              disabled={
+                selectedQuestions.length === 0
+              }
+              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Limpar seleção
+            </button>
+          </div>
+        </div>
+
+        {selectedQuestions.length === 0 ? (
+          <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-5">
+            <p className="text-sm font-semibold text-slate-700">
+              Nenhuma questão selecionada.
+            </p>
+
+            <p className="mt-1 text-xs text-slate-500">
+              Use o botão “Selecionar” nos resultados abaixo para iniciar a sequência.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-5 space-y-3">
+            {selectedQuestions.map(
+              (
+                question,
+                index
+              ) => (
+                <div
+                  key={question.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-teal-100 px-2 text-xs font-bold text-teal-800">
+                        {index + 1}
+                      </span>
+
+                      <span className="font-mono text-xs font-bold text-teal-700">
+                        {question.id}
+                      </span>
+
+                      <span className="text-xs text-slate-400">
+                        {question.competencia}
+                      </span>
+
+                      <span className="text-xs text-slate-400">
+                        {question.habilidade}
+                      </span>
+                    </div>
+
+                    <p className="mt-2 truncate text-sm font-semibold text-slate-900">
+                      {question.objetoPrincipal ||
+                        "Objeto não informado"}
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      {question.dificuldadeRotulo}
+                      {" · "}
+                      {question.ano}
+                      {" · "}
+                      {question.edicao}
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        moveSelectedQuestion(
+                          index,
+                          -1
+                        )
+                      }
+                      disabled={index === 0}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      ↑ Subir
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        moveSelectedQuestion(
+                          index,
+                          1
+                        )
+                      }
+                      disabled={
+                        index ===
+                        selectedQuestions.length -
+                          1
+                      }
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      ↓ Descer
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        toggleQuestionSelection(
+                          question.id
+                        )
+                      }
+                      className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-50"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
+
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3">
+              <p className="text-xs font-semibold text-amber-900">
+                V0.11.5.0 — seleção ainda não persistida
+              </p>
+
+              <p className="mt-1 text-xs leading-5 text-amber-800">
+                Nesta etapa, a seleção permanece apenas enquanto a página estiver aberta. O salvamento no IndexedDB e a criação de uma sequência serão incorporados na próxima etapa.
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* ===================================================
           RESULTADOS
       =================================================== */}
 
@@ -697,18 +945,42 @@ const rankedQuestions =
                         </div>
                       </div>
 
-                      <div className="shrink-0 rounded-2xl border border-teal-100 bg-teal-50 px-4 py-3 text-left lg:min-w-40 lg:text-right">
-                        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-700">
-                          Recomendação
-                        </p>
+                      <div className="flex shrink-0 flex-col gap-2 lg:min-w-44">
+                        <div className="rounded-2xl border border-teal-100 bg-teal-50 px-4 py-3 text-left lg:text-right">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-700">
+                            Recomendação
+                          </p>
 
-                        <p className="mt-1 text-2xl font-black tracking-tight text-teal-900">
-                          {recommendation.score}
-                        </p>
+                          <p className="mt-1 text-2xl font-black tracking-tight text-teal-900">
+                            {recommendation.score}
+                          </p>
 
-                        <p className="text-[11px] text-teal-700">
-                          score pedagógico
-                        </p>
+                          <p className="text-[11px] text-teal-700">
+                            score pedagógico
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleQuestionSelection(
+                              question.id
+                            )
+                          }
+                          className={
+                            isSelected(
+                              question.id
+                            )
+                              ? "rounded-xl border border-teal-600 bg-teal-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-teal-800"
+                              : "rounded-xl border border-teal-200 bg-white px-4 py-2.5 text-sm font-bold text-teal-800 shadow-sm transition hover:bg-teal-50"
+                          }
+                        >
+                          {isSelected(
+                            question.id
+                          )
+                            ? "Selecionada ✓"
+                            : "Selecionar"}
+                        </button>
                       </div>
                     </div>
 

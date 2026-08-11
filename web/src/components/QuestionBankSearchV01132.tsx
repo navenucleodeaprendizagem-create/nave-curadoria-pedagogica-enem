@@ -14,6 +14,7 @@ import {
 import {
   filterQuestions,
   isEligibleQuestion,
+  rankQuestions,
   type QuestionSearchFilters,
 } from "@/lib/questions/question-search";
 
@@ -253,23 +254,36 @@ export default function QuestionBankSearchV01132() {
       [questions]
     );
 
-  /* =======================================================
-     RESULTADO FINAL
-  ======================================================= */
+ /* =======================================================
+   RESULTADO FINAL
+======================================================= */
 
-  const filteredQuestions =
-    useMemo(
-      () =>
-        filterQuestions(
-          questions,
-          filters
-        ),
-      [
+const filteredQuestions =
+  useMemo(
+    () =>
+      filterQuestions(
         questions,
-        filters,
-      ]
-    );
+        filters
+      ),
+    [
+      questions,
+      filters,
+    ]
+  );
 
+
+/* =======================================================
+   RANKING PEDAGÓGICO — V0.11.3.3
+======================================================= */
+
+const rankedQuestions =
+  useMemo(
+    () =>
+      rankQuestions(
+        filteredQuestions
+      ),
+    [filteredQuestions]
+  );
   /* =======================================================
      OPÇÕES DEPENDENTES
   ======================================================= */
@@ -407,7 +421,7 @@ export default function QuestionBankSearchV01132() {
 
         <div>
           <p className="text-sm font-semibold text-teal-700">
-            Busca local — V0.11.3.2
+            Busca local — V0.11.3.3
           </p>
 
           <h2 className="mt-2 text-xl font-bold text-slate-900">
@@ -604,97 +618,109 @@ export default function QuestionBankSearchV01132() {
         ) : (
           <div className="mt-4 divide-y divide-slate-100">
 
-            {filteredQuestions
-              .slice(0, 20)
-              .map(
-                (question) => (
-                  <div
-                    key={
-                      question.id
-                    }
-                    className="py-4"
-                  >
+            {rankedQuestions
+  .slice(0, 20)
+  .map(
+    (recommendation) => {
 
-                    <div className="flex flex-wrap items-center gap-2">
+      const question =
+        recommendation.question;
 
-                      <span className="font-mono text-xs font-semibold text-teal-700">
-                        {
-                          question.id
-                        }
-                      </span>
+      return (
+        <div
+          key={question.id}
+          className="py-4"
+        >
 
-                      <span className="text-xs text-slate-500">
-                        {
-                          question.componentePrincipal
-                        }
-                      </span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
 
-                      <span className="text-xs text-slate-500">
-                        {
-                          question.competencia
-                        }
-                      </span>
+            <div className="flex flex-wrap items-center gap-2">
 
-                      <span className="text-xs text-slate-500">
-                        {
-                          question.habilidade
-                        }
-                      </span>
+              <span className="font-mono text-xs font-semibold text-teal-700">
+                {question.id}
+              </span>
 
-                    </div>
+              <span className="text-xs text-slate-500">
+                {question.componentePrincipal}
+              </span>
 
-                    <p className="mt-1 text-sm font-medium text-slate-800">
-                      {
-                        question.objetoPrincipal ||
-                        "Objeto não informado"
-                      }
-                    </p>
+              <span className="text-xs text-slate-500">
+                {question.competencia}
+              </span>
 
-                    <p className="mt-1 text-xs text-slate-500">
-                      {
-                        question.dificuldadeRotulo
-                      }
-                      {" · "}
-                      {
-                        question.ano
-                      }
-                      {" · "}
-                      {
-                        question.edicao
-                      }
-                    </p>
+              <span className="text-xs text-slate-500">
+                {question.habilidade}
+              </span>
 
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+            </div>
 
-                      <span>
-                        Função:{" "}
-                        {
-                          question.funcaoPedagogica ||
-                          "—"
-                        }
-                      </span>
+            <div className="rounded-lg bg-teal-50 px-3 py-1.5">
 
-                      <span>
-                        Curadoria:{" "}
-                        {
-                          question.statusCuradoria ||
-                          "—"
-                        }
-                      </span>
+              <span className="text-xs font-semibold text-teal-700">
+                Score de recomendação
+              </span>
 
-                      <span>
-                        Validação:{" "}
-                        {
-                          question.statusValidacao ||
-                          "—"
-                        }
-                      </span>
+              <span className="ml-2 text-sm font-bold text-teal-800">
+                {recommendation.score}
+              </span>
 
-                    </div>
+            </div>
 
-                  </div>
-                )
+          </div>
+
+          <p className="mt-1 text-sm font-medium text-slate-800">
+            {question.objetoPrincipal ||
+              "Objeto não informado"}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            {question.dificuldadeRotulo}
+            {" · "}
+            {question.ano}
+            {" · "}
+            {question.edicao}
+          </p>
+
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+
+            <span>
+              Função:{" "}
+              {question.funcaoPedagogica ||
+                "—"}
+            </span>
+
+            <span>
+              Curadoria:{" "}
+              {question.statusCuradoria ||
+                "—"}
+            </span>
+
+            <span>
+              Validação:{" "}
+              {question.statusValidacao ||
+                "—"}
+            </span>
+
+          </div>
+
+          <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2">
+
+            <p className="text-xs font-semibold text-slate-600">
+              Critérios da recomendação
+            </p>
+
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {recommendation.motivos.join(
+                " · "
               )}
+            </p>
+
+          </div>
+
+        </div>
+      );
+    }
+  )}
 
           </div>
         )}

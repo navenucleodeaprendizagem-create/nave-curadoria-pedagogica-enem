@@ -14,6 +14,57 @@ import {
 
 const field = "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-400";
 
+
+function pdfWindowName(
+  source: QuestionPdfSource
+): string {
+  const key =
+    source.urlPdf ||
+    source.nomePublico ||
+    source.colecaoOrigem ||
+    "pdf-original";
+
+  let hash = 0;
+
+  for (
+    let i = 0;
+    i < key.length;
+    i += 1
+  ) {
+    hash =
+      (hash * 31 +
+        key.charCodeAt(i)) |
+      0;
+  }
+
+  return `nave_pdf_${Math.abs(
+    hash
+  ).toString(36)}`;
+}
+
+function openOriginalPdf(
+  source: QuestionPdfSource
+) {
+  const url =
+    source.urlPagina ||
+    source.urlPdf;
+
+  if (!url) {
+    return;
+  }
+
+  const target =
+    pdfWindowName(source);
+
+  const pdfWindow =
+    window.open(
+      url,
+      target
+    );
+
+  pdfWindow?.focus();
+}
+
 type ValidacaoCentralClientProps = {
   initialQuestionId?: string;
   contextual?: boolean;
@@ -214,8 +265,12 @@ export default function ValidacaoCentralClient({
             pdfSource.urlPagina ? (
               <a
                 href={pdfSource.urlPagina}
-                target="_blank"
-                rel="noreferrer"
+                onClick={(event) => {
+                  event.preventDefault();
+                  openOriginalPdf(
+                    pdfSource
+                  );
+                }}
                 className="inline-flex shrink-0 justify-center rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
               >
                 Ver questão original

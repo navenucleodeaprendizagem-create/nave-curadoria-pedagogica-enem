@@ -87,6 +87,57 @@ function statusLabel(
   }
 }
 
+
+function pdfWindowName(
+  source: QuestionPdfSource
+): string {
+  const key =
+    source.urlPdf ||
+    source.nomePublico ||
+    source.colecaoOrigem ||
+    "pdf-original";
+
+  let hash = 0;
+
+  for (
+    let i = 0;
+    i < key.length;
+    i += 1
+  ) {
+    hash =
+      (hash * 31 +
+        key.charCodeAt(i)) |
+      0;
+  }
+
+  return `nave_pdf_${Math.abs(
+    hash
+  ).toString(36)}`;
+}
+
+function openOriginalPdf(
+  source: QuestionPdfSource
+) {
+  const url =
+    source.urlPagina ||
+    source.urlPdf;
+
+  if (!url) {
+    return;
+  }
+
+  const target =
+    pdfWindowName(source);
+
+  const pdfWindow =
+    window.open(
+      url,
+      target
+    );
+
+  pdfWindow?.focus();
+}
+
 export default function SequenciasClient() {
   const searchParams = useSearchParams();
   const sequenceFromValidation = searchParams.get("sequencia");
@@ -1330,8 +1381,12 @@ export default function SequenciasClient() {
                                                     pdfSource.urlPagina ? (
                                                       <a
                                                         href={pdfSource.urlPagina}
-                                                        target="_blank"
-                                                        rel="noreferrer"
+                                                        onClick={(event) => {
+                                                          event.preventDefault();
+                                                          openOriginalPdf(
+                                                            pdfSource
+                                                          );
+                                                        }}
                                                         className="inline-flex rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
                                                       >
                                                         Ver original

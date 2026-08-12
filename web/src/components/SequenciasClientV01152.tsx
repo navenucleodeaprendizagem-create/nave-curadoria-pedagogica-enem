@@ -12,6 +12,11 @@ import {
 import { SYSTEM_VERSION } from "@/lib/system-version";
 
 import {
+  getQuestionPdfSources,
+  type QuestionPdfSource,
+} from "@/lib/sources/question-sources-api";
+
+import {
   createEditorialJobFromSequence,
   deleteLocalSequence,
   getAllEditorialJobs,
@@ -120,6 +125,23 @@ export default function SequenciasClient() {
         NaveQuestionRecord
       >
     >({});
+
+  const [
+    pdfSourcesByQuestionId,
+    setPdfSourcesByQuestionId,
+  ] =
+    useState<
+      Record<
+        string,
+        QuestionPdfSource
+      >
+    >({});
+
+  const [
+    sourceError,
+    setSourceError,
+  ] =
+    useState("");
 
   const [
     loadingSequenceId,
@@ -292,6 +314,53 @@ export default function SequenciasClient() {
         sequenceId
       ]
     ) {
+      const cachedItems =
+        sequenceItems[
+          sequenceId
+        ];
+
+      const missingIds =
+        cachedItems
+          .map(
+            (item) =>
+              item.questionId
+          )
+          .filter(
+            (id) =>
+              !pdfSourcesByQuestionId[
+                id
+              ]
+          );
+
+      if (missingIds.length) {
+        try {
+          const sources =
+            await getQuestionPdfSources(
+              missingIds
+            );
+
+          setPdfSourcesByQuestionId(
+            (current) => ({
+              ...current,
+              ...Object.fromEntries(
+                sources.map(
+                  (source) => [
+                    source.idQuestao,
+                    source,
+                  ]
+                )
+              ),
+            })
+          );
+        } catch (error) {
+          setSourceError(
+            error instanceof Error
+              ? error.message
+              : "Falha ao consultar as fontes PDF."
+          );
+        }
+      }
+
       setExpandedSequenceId(
         sequenceId
       );
@@ -308,6 +377,38 @@ export default function SequenciasClient() {
         await getLocalSequenceItems(
           sequenceId
         );
+
+      setSourceError("");
+
+      try {
+        const sources =
+          await getQuestionPdfSources(
+            items.map(
+              (item) =>
+                item.questionId
+            )
+          );
+
+        setPdfSourcesByQuestionId(
+          (current) => ({
+            ...current,
+            ...Object.fromEntries(
+              sources.map(
+                (source) => [
+                  source.idQuestao,
+                  source,
+                ]
+              )
+            ),
+          })
+        );
+      } catch (error) {
+        setSourceError(
+          error instanceof Error
+            ? error.message
+            : "Falha ao consultar as fontes PDF."
+        );
+      }
 
       setSequenceItems(
         (current) => ({
@@ -691,6 +792,14 @@ export default function SequenciasClient() {
         <div className="mt-5 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3">
           <p className="text-sm font-semibold text-teal-800">
             {actionMessage}
+          </p>
+        </div>
+      ) : null}
+
+      {sourceError ? (
+        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800">
+            Não foi possível consultar a fonte original agora: {sourceError}
           </p>
         </div>
       ) : null}
@@ -1124,6 +1233,11 @@ export default function SequenciasClient() {
                                       item.questionId
                                     ];
 
+                                  const pdfSource =
+                                    pdfSourcesByQuestionId[
+                                      item.questionId
+                                    ];
+
                                   return (
                                     <div
                                       key={
@@ -1197,17 +1311,52 @@ export default function SequenciasClient() {
                                                 </span>
                                               </div>
 
-                                              <div className="mt-3">
-                                                <Link
-                                                  href={`/validacao?id=${encodeURIComponent(
-                                                    item.questionId
-                                                  )}&origem=sequencias&sequencia=${encodeURIComponent(
-                                                    sequence.id
-                                                  )}`}
-                                                  className="inline-flex rounded-xl border border-teal-200 bg-white px-3 py-2 text-xs font-bold text-teal-800 shadow-sm transition hover:bg-teal-50"
-                                                >
-                                                  Validar
-                                                </Link>
+                                              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                  <p className="text-xs text-slate-600">
+                                                    <span className="font-semibold text-slate-700">
+                                                      Fonte:
+                                                    </span>{" "}
+                                                    {pdfSource?.nomePublico ||
+                                                      pdfSource?.colecaoOrigem ||
+                                                      "não localizada"}
+                                                    {pdfSource?.paginaPdf
+                                                      ? ` · pág. ${pdfSource.paginaPdf}`
+                                                      : ""}
+                                                  </p>
+
+                                                  <div className="flex flex-wrap gap-2">
+                                                    {pdfSource?.disponivel &&
+                                                    pdfSource.urlPagina ? (
+                                                      <a
+                                                        href={pdfSource.urlPagina}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="inline-flex rounded-xl border border-indigo-200 bg-white px-3 py-2 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+                                                      >
+                                                        Ver original
+                                                      </a>
+                                                    ) : (
+                                                      <span
+                                                        title={pdfSource?.motivo || "Fonte não localizada."}
+                                                        className="inline-flex rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800"
+                                                      >
+                                                        Fonte indisponível
+                                                      </span>
+                                                    )}
+
+                                                    <Link
+                                                      href={`/validacao?id=${encodeURIComponent(
+                                                        item.questionId
+                                                      )}&origem=sequencias&sequencia=${encodeURIComponent(
+                                                        sequence.id
+                                                      )}`}
+                                                      className="inline-flex rounded-xl border border-teal-200 bg-white px-3 py-2 text-xs font-bold text-teal-800 shadow-sm transition hover:bg-teal-50"
+                                                    >
+                                                      Validar
+                                                    </Link>
+                                                  </div>
+                                                </div>
                                               </div>
 
                                               <p className="mt-3 text-sm leading-6 text-slate-600">

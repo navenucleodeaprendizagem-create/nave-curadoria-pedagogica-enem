@@ -7,6 +7,11 @@ import {
   type ValidationQuestion,
 } from "@/lib/validation/validation-api";
 
+import {
+  getQuestionPdfSource,
+  type QuestionPdfSource,
+} from "@/lib/sources/question-sources-api";
+
 const field = "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-400";
 
 type ValidacaoCentralClientProps = {
@@ -22,6 +27,8 @@ export default function ValidacaoCentralClient({
   const formRef = useRef<HTMLDivElement | null>(null);
   const [id, setId] = useState(initialQuestionId);
   const [question, setQuestion] = useState<ValidationQuestion | null>(null);
+  const [pdfSource, setPdfSource] = useState<QuestionPdfSource | null>(null);
+  const [sourceMessage, setSourceMessage] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -76,6 +83,44 @@ export default function ValidacaoCentralClient({
       }
     })();
   }, [initialQuestionId]);
+
+  useEffect(() => {
+    if (!question?.id) {
+      setPdfSource(null);
+      setSourceMessage("");
+      return;
+    }
+
+    void (async () => {
+      try {
+        setSourceMessage("");
+
+        const source =
+          await getQuestionPdfSource(
+            question.id
+          );
+
+        setPdfSource(source);
+
+        if (
+          source &&
+          !source.disponivel
+        ) {
+          setSourceMessage(
+            source.motivo ||
+              "Fonte original indisponível."
+          );
+        }
+      } catch (e) {
+        setPdfSource(null);
+        setSourceMessage(
+          e instanceof Error
+            ? e.message
+            : "Falha ao consultar a fonte original."
+        );
+      }
+    })();
+  }, [question?.id]);
 
   async function save() {
     if (!question) return;
@@ -144,6 +189,40 @@ export default function ValidacaoCentralClient({
           </div>
           <h3 className="mt-4 text-xl font-bold">{question.objeto}</h3>
           <p className="mt-2 text-sm text-slate-500">{question.competencia} · {question.habilidade} · {question.dificuldade} · {question.ano} {question.edicao}</p>
+
+          <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-indigo-700">
+                Fonte original
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">
+                {pdfSource?.nomePublico ||
+                  pdfSource?.colecaoOrigem ||
+                  "Fonte ainda não localizada"}
+                {pdfSource?.paginaPdf
+                  ? ` · página ${pdfSource.paginaPdf}`
+                  : ""}
+              </p>
+              {sourceMessage ? (
+                <p className="mt-1 text-xs text-amber-700">
+                  {sourceMessage}
+                </p>
+              ) : null}
+            </div>
+
+            {pdfSource?.disponivel &&
+            pdfSource.urlPagina ? (
+              <a
+                href={pdfSource.urlPagina}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex shrink-0 justify-center rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
+              >
+                Ver questão original
+              </a>
+            ) : null}
+          </div>
+
           <p className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">{question.trecho || "Trecho não disponível."}</p>
         </div>
 

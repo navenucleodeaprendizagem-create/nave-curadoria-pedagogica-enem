@@ -231,6 +231,130 @@ function doPost(e) {
     }
 
     /* =====================================================
+       V0.11.11 — EDITORAÇÃO CENTRAL
+    ===================================================== */
+
+    if (
+      action ===
+      'listActiveEditorialSequenceIds'
+    ) {
+      const ss =
+        obterSpreadsheetOfflineSyncV070_();
+
+      const contexto =
+        obterContextoUsuarioAutenticadoV090_(
+          body.emailAutenticacao,
+          body.idGoogle,
+          ss
+        );
+
+      const sequenceIds =
+        listarSequenciasAtivasEditoracaoCentralV01111_(
+          ss,
+          contexto
+        );
+
+      return respostaJsonOfflineSyncV070_({
+        ok: true,
+        action:
+          'listActiveEditorialSequenceIds',
+        sequenceIds:
+          sequenceIds
+      });
+    }
+
+
+    if (
+      action ===
+      'listEditorialJobs'
+    ) {
+      const ss =
+        obterSpreadsheetOfflineSyncV070_();
+
+      const contexto =
+        obterContextoUsuarioAutenticadoV090_(
+          body.emailAutenticacao,
+          body.idGoogle,
+          ss
+        );
+
+      const jobs =
+        listarEditoracaoCentralV01111_(
+          ss,
+          contexto
+        );
+
+      return respostaJsonOfflineSyncV070_({
+        ok: true,
+        action:
+          'listEditorialJobs',
+        jobs: jobs
+      });
+    }
+
+
+    if (
+      action ===
+      'createEditorialJob'
+    ) {
+      const ss =
+        obterSpreadsheetOfflineSyncV070_();
+
+      const contexto =
+        obterContextoUsuarioAutenticadoV090_(
+          body.emailAutenticacao,
+          body.idGoogle,
+          ss
+        );
+
+      const job =
+        criarEditoracaoCentralV01111_(
+          ss,
+          contexto,
+          body.editorialJob
+        );
+
+      return respostaJsonOfflineSyncV070_({
+        ok: true,
+        action:
+          'createEditorialJob',
+        job: job
+      });
+    }
+
+
+    if (
+      action ===
+      'updateEditorialJobStatus'
+    ) {
+      const ss =
+        obterSpreadsheetOfflineSyncV070_();
+
+      const contexto =
+        obterContextoUsuarioAutenticadoV090_(
+          body.emailAutenticacao,
+          body.idGoogle,
+          ss
+        );
+
+      const job =
+        atualizarStatusEditoracaoCentralV01111_(
+          ss,
+          contexto,
+          body.id,
+          body.status
+        );
+
+      return respostaJsonOfflineSyncV070_({
+        ok: true,
+        action:
+          'updateEditorialJobStatus',
+        job: job
+      });
+    }
+
+
+    /* =====================================================
        AÇÃO DESCONHECIDA
     ===================================================== */
 

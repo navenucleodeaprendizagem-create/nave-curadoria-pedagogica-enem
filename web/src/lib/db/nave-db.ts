@@ -745,6 +745,109 @@ export async function getLocalSequenceWithItems(
 
 
 /* ---------------------------------------------------------
+   ATUALIZAÇÃO DE STATUS DA SEQUÊNCIA
+--------------------------------------------------------- */
+
+export async function updateLocalSequenceStatus(
+  sequenceId: string,
+  status: NaveSequenceStatus
+): Promise<NaveSequenceRecord> {
+  const db =
+    await openNaveDb();
+
+  return new Promise(
+    (resolve, reject) => {
+      const transaction =
+        db.transaction(
+          STORES.SEQUENCES,
+          "readwrite"
+        );
+
+      const store =
+        transaction.objectStore(
+          STORES.SEQUENCES
+        );
+
+      const request =
+        store.get(sequenceId);
+
+      let updated:
+        | NaveSequenceRecord
+        | undefined;
+
+      request.onsuccess =
+        () => {
+          const current =
+            request.result as
+              | NaveSequenceRecord
+              | undefined;
+
+          if (!current) {
+            transaction.abort();
+            return;
+          }
+
+          updated = {
+            ...current,
+            status,
+            updatedAt:
+              new Date().toISOString(),
+          };
+
+          store.put(updated);
+        };
+
+      request.onerror =
+        () => {
+          transaction.abort();
+        };
+
+      transaction.oncomplete =
+        () => {
+          db.close();
+
+          if (!updated) {
+            reject(
+              new Error(
+                "Sequência não encontrada."
+              )
+            );
+
+            return;
+          }
+
+          resolve(updated);
+        };
+
+      transaction.onerror =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "Falha ao atualizar o status da sequência."
+              )
+          );
+        };
+
+      transaction.onabort =
+        () => {
+          db.close();
+
+          reject(
+            transaction.error ??
+              new Error(
+                "A atualização do status da sequência foi interrompida."
+              )
+          );
+        };
+    }
+  );
+}
+
+
+/* ---------------------------------------------------------
    ATUALIZAÇÃO DE METADADOS
 --------------------------------------------------------- */
 

@@ -11,18 +11,22 @@ import {
 import { SYSTEM_VERSION } from "@/lib/system-version";
 
 import {
-  createEditorialJobFromSequence,
   deleteLocalSequence,
-  getAllEditorialJobs,
   getAllLocalSequences,
   getAllQuestions,
   getLocalSequenceItems,
   replaceLocalSequenceItems,
   updateLocalSequenceMetadata,
+  updateLocalSequenceStatus,
   type NaveQuestionRecord,
   type NaveSequenceItemRecord,
   type NaveSequenceRecord,
 } from "@/lib/db/nave-db";
+
+import {
+  createCentralEditorialJob,
+  getCentralEditorialActiveSequenceIds,
+} from "@/lib/editorial/editorial-api";
 
 type SequenceState =
   | {
@@ -199,7 +203,7 @@ export default function SequenciasClient() {
           await Promise.all([
             getAllLocalSequences(),
             getAllQuestions(),
-            getAllEditorialJobs(),
+            getCentralEditorialActiveSequenceIds(),
           ]);
 
         const nextQuestionsById =
@@ -219,17 +223,6 @@ export default function SequenciasClient() {
         setActiveEditorialSequenceIds(
           new Set(
             editorialJobs
-              .filter(
-                (job) =>
-                  job.status ===
-                    "aguardando" ||
-                  job.status ===
-                    "em_producao"
-              )
-              .map(
-                (job) =>
-                  job.sequenceId
-              )
           )
         );
 
@@ -532,12 +525,55 @@ export default function SequenciasClient() {
 
       setActionMessage("");
 
-      await createEditorialJobFromSequence(
-        sequence.id
+      const items =
+        await getLocalSequenceItems(
+          sequence.id
+        );
+
+      if (
+        items.length === 0
+      ) {
+        throw new Error(
+          "A sequência não possui questões para enviar à editoração."
+        );
+      }
+
+      await createCentralEditorialJob({
+        sequenceId:
+          sequence.id,
+
+        titulo:
+          sequence.titulo,
+
+        descricao:
+          sequence.descricao ?? "",
+
+        questionIds:
+          items
+            .sort(
+              (a, b) =>
+                a.position -
+                b.position
+            )
+            .map(
+              (item) =>
+                item.questionId
+            ),
+      });
+
+      await updateLocalSequenceStatus(
+        sequence.id,
+        "pronta"
       );
 
+      /*
+       * O backend central passa a ser a fonte
+       * institucional da fila editorial.
+       * A sequência local permanece como área
+       * de trabalho do professor.
+       */
       setActionMessage(
-        `Sequência “${sequence.titulo}” enviada para editoração.`
+        `Sequência “${sequence.titulo}” enviada para a fila editorial central.`
       );
 
       await loadSequences();

@@ -10,13 +10,16 @@ import {
 } from "react";
 
 import {
-  getAllEditorialJobs,
   getAllQuestions,
-  updateEditorialJobStatus,
-  type NaveEditorialJob,
-  type NaveEditorialJobStatus,
   type NaveQuestionRecord,
 } from "@/lib/db/nave-db";
+
+import {
+  getCentralEditorialJobs,
+  updateCentralEditorialJobStatus,
+  type NaveEditorialCentralJob,
+  type NaveEditorialCentralStatus,
+} from "@/lib/editorial/editorial-api";
 
 function formatDate(
   value: string
@@ -42,7 +45,7 @@ function formatDate(
 }
 
 function statusLabel(
-  status: NaveEditorialJobStatus
+  status: NaveEditorialCentralStatus
 ): string {
   switch (status) {
     case "aguardando":
@@ -59,7 +62,7 @@ function statusLabel(
 }
 
 function statusClass(
-  status: NaveEditorialJobStatus
+  status: NaveEditorialCentralStatus
 ): string {
   switch (status) {
     case "aguardando":
@@ -81,7 +84,7 @@ export default function EditoracaoClient() {
     setJobs,
   ] =
     useState<
-      NaveEditorialJob[]
+      NaveEditorialCentralJob[]
     >([]);
 
   const [
@@ -140,7 +143,7 @@ export default function EditoracaoClient() {
           questions,
         ] =
           await Promise.all([
-            getAllEditorialJobs(),
+            getCentralEditorialJobs(),
             getAllQuestions(),
           ]);
 
@@ -198,8 +201,8 @@ export default function EditoracaoClient() {
     );
 
   async function changeStatus(
-    job: NaveEditorialJob,
-    status: NaveEditorialJobStatus
+    job: NaveEditorialCentralJob,
+    status: NaveEditorialCentralStatus
   ) {
     try {
       setUpdatingJobId(
@@ -208,7 +211,7 @@ export default function EditoracaoClient() {
 
       setActionMessage("");
 
-      await updateEditorialJobStatus(
+      await updateCentralEditorialJobStatus(
         job.id,
         status
       );
@@ -275,7 +278,7 @@ export default function EditoracaoClient() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-indigo-700">
-              Fila editorial local
+              Fila editorial central
             </p>
 
             <h2 className="mt-1 text-xl font-bold text-slate-950">
@@ -283,7 +286,7 @@ export default function EditoracaoClient() {
             </h2>
 
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-              Cada envio preserva um snapshot da sequência e da ordem das questões no momento do encaminhamento.
+              Fila institucional compartilhada. Cada envio preserva o snapshot da sequência e da ordem das questões no momento do encaminhamento.
             </p>
           </div>
 
@@ -390,6 +393,22 @@ export default function EditoracaoClient() {
                             job.createdAt
                           )}
                         </p>
+
+                        <p className="mt-1 text-xs text-slate-400">
+                          Professor:{" "}
+                          {job.professorNome ||
+                            job.professorEmail ||
+                            "—"}
+                        </p>
+
+                        {job.responsavelEditoracaoNome ||
+                        job.responsavelEditoracaoEmail ? (
+                          <p className="mt-1 text-xs text-slate-400">
+                            Editoração:{" "}
+                            {job.responsavelEditoracaoNome ||
+                              job.responsavelEditoracaoEmail}
+                          </p>
+                        ) : null}
                       </div>
 
                       <div className="flex shrink-0 flex-wrap gap-2">

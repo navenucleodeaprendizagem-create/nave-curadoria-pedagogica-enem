@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import UsuariosManualNoticeV011160 from "@/components/UsuariosManualNoticeV011160";
+
 import {
   requireNavePermission,
 } from "@/lib/auth/require-nave-permission";
@@ -32,11 +34,17 @@ export default async function UsuariosPage() {
           </h1>
 
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600">
-            Área protegida para gestão de usuários, perfis e permissões.
+            Consulta de usuários, perfis e
+            permissões de acesso ao Sistema
+            NAVE.
           </p>
         </div>
 
-        <div className="mt-10 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mt-10">
+          <UsuariosManualNoticeV011160 />
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="text-sm text-slate-500">
             Usuário autorizado
           </div>

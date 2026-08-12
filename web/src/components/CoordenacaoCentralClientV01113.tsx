@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   decideCentralCoordinationCase,
   getCentralCoordinationCase,
@@ -18,6 +18,8 @@ const DECISIONS = [
 ];
 
 export default function CoordenacaoCentralClient() {
+  const analysisRef = useRef<HTMLDivElement | null>(null);
+  const messageRef = useRef<HTMLDivElement | null>(null);
   const [cases,setCases]=useState<CoordinationCaseSummary[]>([]);
   const [selected,setSelected]=useState<CoordinationCase|null>(null);
   const [loading,setLoading]=useState(true);
@@ -67,6 +69,28 @@ export default function CoordenacaoCentralClient() {
   const pending=cases.filter(c=>!c.resolvido);
   const resolved=cases.filter(c=>c.resolvido);
 
+  useEffect(() => {
+    if (!selected) return;
+
+    window.setTimeout(() => {
+      analysisRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 80);
+  }, [selected?.idValidacao]);
+
+  useEffect(() => {
+    if (!message) return;
+
+    window.setTimeout(() => {
+      messageRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 80);
+  }, [message]);
+
   return <section className="mt-6 space-y-5">
     <div className="grid gap-3 sm:grid-cols-3">
       {[
@@ -79,7 +103,7 @@ export default function CoordenacaoCentralClient() {
       </div>)}
     </div>
 
-    {message?<div className="rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-900">{message}</div>:null}
+    {message?<div ref={messageRef} className="scroll-mt-24 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-900">{message}</div>:null}
 
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-center justify-between gap-3">
@@ -115,7 +139,7 @@ export default function CoordenacaoCentralClient() {
       </div>
     </div>
 
-    {selected?<div className="rounded-3xl border border-indigo-200 bg-white p-6 shadow-sm">
+    {selected?<div ref={analysisRef} className="scroll-mt-24 rounded-3xl border border-indigo-200 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between">
         <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-indigo-700">Análise da coordenação</p>
         <h2 className="mt-1 text-xl font-bold">{selected.idQuestao}</h2></div>

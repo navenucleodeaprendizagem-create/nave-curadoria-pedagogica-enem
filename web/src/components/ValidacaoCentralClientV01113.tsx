@@ -9,10 +9,18 @@ import {
 
 const field = "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-teal-400";
 
-export default function ValidacaoCentralClient() {
+type ValidacaoCentralClientProps = {
+  initialQuestionId?: string;
+  contextual?: boolean;
+};
+
+export default function ValidacaoCentralClient({
+  initialQuestionId = "",
+  contextual = false,
+}: ValidacaoCentralClientProps) {
   const messageRef = useRef<HTMLDivElement | null>(null);
   const formRef = useRef<HTMLDivElement | null>(null);
-  const [id, setId] = useState("");
+  const [id, setId] = useState(initialQuestionId);
   const [question, setQuestion] = useState<ValidationQuestion | null>(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,6 +49,33 @@ export default function ValidacaoCentralClient() {
       setMessage(e instanceof Error ? e.message : "Falha ao carregar.");
     } finally { setLoading(false); }
   }
+
+  useEffect(() => {
+    if (!initialQuestionId) return;
+
+    void (async () => {
+      try {
+        setLoading(true);
+        setMessage("");
+
+        const q =
+          await getValidationQuestion(
+            initialQuestionId
+          );
+
+        setQuestion(q);
+      } catch (e) {
+        setQuestion(null);
+        setMessage(
+          e instanceof Error
+            ? e.message
+            : "Falha ao carregar."
+        );
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [initialQuestionId]);
 
   async function save() {
     if (!question) return;
@@ -78,20 +113,27 @@ export default function ValidacaoCentralClient() {
 
   return (
     <section className="mt-6 space-y-5">
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">Validação central</p>
-        <h2 className="mt-1 text-xl font-bold">Carregar questão</h2>
-        <div className="mt-4 flex gap-2">
-          <input value={id} onChange={e=>setId(e.target.value)}
-            placeholder="Ex.: ESP_H24_Q432"
-            className="min-w-0 flex-1 rounded-xl border border-slate-200 px-4 py-3 font-mono text-sm"/>
-          <button type="button" disabled={loading} onClick={()=>void load()}
-            className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">
-            {loading ? "Carregando..." : "Carregar"}
-          </button>
+      {!contextual ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-[0.15em] text-teal-700">Validação central</p>
+          <h2 className="mt-1 text-xl font-bold">Carregar questão</h2>
+          <div className="mt-4 flex gap-2">
+            <input value={id} onChange={e=>setId(e.target.value)}
+              placeholder="Ex.: ESP_H24_Q432"
+              className="min-w-0 flex-1 rounded-xl border border-slate-200 px-4 py-3 font-mono text-sm"/>
+            <button type="button" disabled={loading} onClick={()=>void load()}
+              className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white disabled:opacity-50">
+              {loading ? "Carregando..." : "Carregar"}
+            </button>
+          </div>
         </div>
-        {message ? <div ref={messageRef} className="mt-4 scroll-mt-24 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-900">{message}</div> : null}
-      </div>
+      ) : loading && !question ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
+          Carregando questão para validação...
+        </div>
+      ) : null}
+
+      {message ? <div ref={messageRef} className="scroll-mt-24 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm font-semibold text-teal-900">{message}</div> : null}
 
       {question ? <>
         <div ref={formRef} className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">

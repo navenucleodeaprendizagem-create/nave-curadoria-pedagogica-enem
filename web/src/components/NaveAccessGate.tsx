@@ -94,15 +94,6 @@ export default async function NaveAccessGate() {
           </Link>
         )}
 
-        {permissions.validar && (
-          <Link
-            href="/validacao"
-            className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium shadow-sm transition hover:border-slate-300 hover:shadow"
-          >
-            Validação
-          </Link>
-        )}
-
         {permissions.coordenacao && (
           <Link
             href="/coordenacao"

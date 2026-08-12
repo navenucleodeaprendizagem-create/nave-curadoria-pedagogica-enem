@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 import {
   useCallback,
@@ -11,22 +12,18 @@ import {
 import { SYSTEM_VERSION } from "@/lib/system-version";
 
 import {
+  createEditorialJobFromSequence,
   deleteLocalSequence,
+  getAllEditorialJobs,
   getAllLocalSequences,
   getAllQuestions,
   getLocalSequenceItems,
   replaceLocalSequenceItems,
   updateLocalSequenceMetadata,
-  updateLocalSequenceStatus,
   type NaveQuestionRecord,
   type NaveSequenceItemRecord,
   type NaveSequenceRecord,
 } from "@/lib/db/nave-db";
-
-import {
-  createCentralEditorialJob,
-  getCentralEditorialActiveSequenceIds,
-} from "@/lib/editorial/editorial-api";
 
 type SequenceState =
   | {
@@ -86,6 +83,8 @@ function statusLabel(
 }
 
 export default function SequenciasClient() {
+  const searchParams = useSearchParams();
+  const sequenceFromValidation = searchParams.get("sequencia");
   const [state, setState] =
     useState<SequenceState>({
       status: "loading",
@@ -203,7 +202,7 @@ export default function SequenciasClient() {
           await Promise.all([
             getAllLocalSequences(),
             getAllQuestions(),
-            getCentralEditorialActiveSequenceIds(),
+            getAllEditorialJobs(),
           ]);
 
         const nextQuestionsById =
@@ -223,6 +222,17 @@ export default function SequenciasClient() {
         setActiveEditorialSequenceIds(
           new Set(
             editorialJobs
+              .filter(
+                (job) =>
+                  job.status ===
+                    "aguardando" ||
+                  job.status ===
+                    "em_producao"
+              )
+              .map(
+                (job) =>
+                  job.sequenceId
+              )
           )
         );
 
@@ -245,6 +255,24 @@ export default function SequenciasClient() {
   useEffect(() => {
     void loadSequences();
   }, [loadSequences]);
+
+  useEffect(() => {
+    if (
+      !sequenceFromValidation ||
+      state.status !== "ready" ||
+      expandedSequenceId === sequenceFromValidation
+    ) {
+      return;
+    }
+
+    void handleOpen(
+      sequenceFromValidation
+    );
+  }, [
+    sequenceFromValidation,
+    state.status,
+    expandedSequenceId,
+  ]);
 
   async function handleOpen(
     sequenceId: string
@@ -525,55 +553,12 @@ export default function SequenciasClient() {
 
       setActionMessage("");
 
-      const items =
-        await getLocalSequenceItems(
-          sequence.id
-        );
-
-      if (
-        items.length === 0
-      ) {
-        throw new Error(
-          "A sequência não possui questões para enviar à editoração."
-        );
-      }
-
-      await createCentralEditorialJob({
-        sequenceId:
-          sequence.id,
-
-        titulo:
-          sequence.titulo,
-
-        descricao:
-          sequence.descricao ?? "",
-
-        questionIds:
-          items
-            .sort(
-              (a, b) =>
-                a.position -
-                b.position
-            )
-            .map(
-              (item) =>
-                item.questionId
-            ),
-      });
-
-      await updateLocalSequenceStatus(
-        sequence.id,
-        "pronta"
+      await createEditorialJobFromSequence(
+        sequence.id
       );
 
-      /*
-       * O backend central passa a ser a fonte
-       * institucional da fila editorial.
-       * A sequência local permanece como área
-       * de trabalho do professor.
-       */
       setActionMessage(
-        `Sequência “${sequence.titulo}” enviada para a fila editorial central.`
+        `Sequência “${sequence.titulo}” enviada para editoração.`
       );
 
       await loadSequences();
@@ -1210,6 +1195,19 @@ export default function SequenciasClient() {
                                                     "Função pedagógica não informada"
                                                   }
                                                 </span>
+                                              </div>
+
+                                              <div className="mt-3">
+                                                <Link
+                                                  href={`/validacao?id=${encodeURIComponent(
+                                                    item.questionId
+                                                  )}&origem=sequencias&sequencia=${encodeURIComponent(
+                                                    sequence.id
+                                                  )}`}
+                                                  className="inline-flex rounded-xl border border-teal-200 bg-white px-3 py-2 text-xs font-bold text-teal-800 shadow-sm transition hover:bg-teal-50"
+                                                >
+                                                  Validar
+                                                </Link>
                                               </div>
 
                                               <p className="mt-3 text-sm leading-6 text-slate-600">

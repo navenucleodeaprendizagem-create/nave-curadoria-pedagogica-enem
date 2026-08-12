@@ -33,6 +33,17 @@ type EditorialApiResponse = {
   jobs?: NaveEditorialCentralJob[];
   job?: NaveEditorialCentralJob;
   sequenceIds?: string[];
+
+  packageInfo?: {
+    idEnvio: string;
+    idProjeto: string;
+    quantidadeQuestoes?: number;
+    fontesIncompletas?: number;
+    itensNaoLiberados?: number;
+    statusPacote: string;
+    reutilizado?: boolean;
+  };
+
   error?: string;
   reason?: string;
 };
@@ -210,4 +221,36 @@ export async function updateCentralEditorialJobStatus(
   }
 
   return result.job;
+}
+
+
+export async function prepareCentralEditorialPackage(
+  id: string
+): Promise<{
+  idEnvio: string;
+  idProjeto: string;
+  quantidadeQuestoes?: number;
+  fontesIncompletas?: number;
+  itensNaoLiberados?: number;
+  statusPacote: string;
+  reutilizado?: boolean;
+}> {
+  const result =
+    await requestEditorialApi({
+      method: "POST",
+
+      body: JSON.stringify({
+        operation:
+          "preparePackage",
+        id,
+      }),
+    });
+
+  if (!result.packageInfo) {
+    throw new Error(
+      "A API não retornou os dados do pacote editorial."
+    );
+  }
+
+  return result.packageInfo;
 }

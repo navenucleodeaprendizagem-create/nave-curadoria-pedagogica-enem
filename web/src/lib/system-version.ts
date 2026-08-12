@@ -1,1 +1,1 @@
-﻿export const SYSTEM_VERSION = "V0.11.11.1";
+﻿export const SYSTEM_VERSION = "V0.11.12.0";

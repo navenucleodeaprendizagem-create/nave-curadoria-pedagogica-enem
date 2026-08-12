@@ -16,7 +16,8 @@ type EditorialStatus =
 type EditorialRequestBody = {
   operation?:
     | "create"
-    | "updateStatus";
+    | "updateStatus"
+    | "preparePackage";
 
   sequenceId?: string;
   titulo?: string;
@@ -569,6 +570,77 @@ export async function POST(
             Error
               ? error.message
               : "Falha ao atualizar a fila editorial.",
+        },
+        502
+      );
+    }
+  }
+
+  if (
+    body.operation ===
+    "preparePackage"
+  ) {
+    const authResult =
+      await authorize(
+        "editoracao"
+      );
+
+    if (!authResult.ok) {
+      return authResult.response;
+    }
+
+    const {
+      context,
+    } =
+      authResult;
+
+    const id =
+      String(
+        body.id ?? ""
+      ).trim();
+
+    if (!id) {
+      return json(
+        {
+          ok: false,
+          error:
+            "ID editorial ausente.",
+        },
+        400
+      );
+    }
+
+    try {
+      const result =
+        await callAppsScript({
+          action:
+            "prepareEditorialPackage",
+
+          emailAutenticacao:
+            context.user.emailAutenticacao,
+
+          idGoogle:
+            context.user.idGoogle,
+
+          id,
+        });
+
+      return json({
+        ok: true,
+        packageInfo:
+          result.packageInfo ??
+          null,
+      });
+    } catch (error) {
+      return json(
+        {
+          ok: false,
+
+          error:
+            error instanceof
+            Error
+              ? error.message
+              : "Falha ao preparar o pacote editorial.",
         },
         502
       );

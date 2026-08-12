@@ -16,6 +16,7 @@ import {
 
 import {
   getCentralEditorialJobs,
+  prepareCentralEditorialPackage,
   updateCentralEditorialJobStatus,
   type NaveEditorialCentralJob,
   type NaveEditorialCentralStatus,
@@ -132,6 +133,14 @@ export default function EditoracaoClient() {
       null
     );
 
+  const [
+    preparingPackageJobId,
+    setPreparingPackageJobId,
+  ] =
+    useState<string | null>(
+      null
+    );
+
   const loadData =
     useCallback(async () => {
       try {
@@ -199,6 +208,57 @@ export default function EditoracaoClient() {
       }),
       [jobs]
     );
+
+  async function preparePackage(
+    job: NaveEditorialCentralJob
+  ) {
+    try {
+      setPreparingPackageJobId(
+        job.id
+      );
+
+      setActionMessage("");
+
+      const result =
+        await prepareCentralEditorialPackage(
+          job.id
+        );
+
+      const detalhes = [
+        `Projeto ${result.idProjeto}`,
+        result.quantidadeQuestoes !==
+        undefined
+          ? `${result.quantidadeQuestoes} questão(ões)`
+          : "",
+        result.fontesIncompletas !==
+        undefined
+          ? `${result.fontesIncompletas} fonte(s) incompleta(s)`
+          : "",
+        result.itensNaoLiberados !==
+        undefined
+          ? `${result.itensNaoLiberados} item(ns) ainda não liberado(s)`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      setActionMessage(
+        `Pacote editorial de “${job.titulo}” preparado. ${detalhes}`
+      );
+
+      await loadData();
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error
+          ? error.message
+          : "Falha ao preparar o pacote editorial."
+      );
+    } finally {
+      setPreparingPackageJobId(
+        null
+      );
+    }
+  }
 
   async function changeStatus(
     job: NaveEditorialCentralJob,
@@ -446,6 +506,28 @@ export default function EditoracaoClient() {
                             ? "Fechar"
                             : "Ver snapshot"}
                         </button>
+
+                        {job.status ===
+                        "concluido" ? (
+                          <button
+                            type="button"
+                            disabled={
+                              preparingPackageJobId ===
+                              job.id
+                            }
+                            onClick={() =>
+                              void preparePackage(
+                                job
+                              )
+                            }
+                            className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {preparingPackageJobId ===
+                            job.id
+                              ? "Preparando..."
+                              : "Preparar pacote"}
+                          </button>
+                        ) : null}
 
                         {job.status ===
                         "aguardando" ? (

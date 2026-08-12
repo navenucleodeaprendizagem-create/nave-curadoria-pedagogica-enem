@@ -211,16 +211,35 @@ export default function EditoracaoClient() {
 
       setActionMessage("");
 
-      await updateCentralEditorialJobStatus(
-        job.id,
-        status
-      );
+      const updatedJob =
+        await updateCentralEditorialJobStatus(
+          job.id,
+          status
+        );
 
-      await loadData();
+      /*
+       * V0.11.11.1
+       * Atualiza imediatamente o estado da tela usando
+       * a resposta confirmada pelo backend central.
+       *
+       * Evita que uma leitura imediatamente posterior
+       * da planilha devolva momentaneamente o estado
+       * anterior e deixe contadores/badge desatualizados.
+       */
+      setJobs(
+        (currentJobs) =>
+          currentJobs.map(
+            (currentJob) =>
+              currentJob.id ===
+              updatedJob.id
+                ? updatedJob
+                : currentJob
+          )
+      );
 
       setActionMessage(
         `Status de “${job.titulo}” atualizado para ${statusLabel(
-          status
+          updatedJob.status
         )}.`
       );
     } catch (error) {

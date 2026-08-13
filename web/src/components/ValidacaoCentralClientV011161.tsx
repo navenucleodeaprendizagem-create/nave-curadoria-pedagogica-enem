@@ -238,9 +238,39 @@ export default function ValidacaoCentralClient({
             <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">{question.statusValidacao}</span>
             <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-800">{question.maturidadeCuradoria}</span>
           </div>
-          <h3 className="mt-4 text-xl font-bold">{question.objeto}</h3>
-          <p className="mt-2 text-sm text-slate-500">{question.competencia} · {question.habilidade} · {question.dificuldade} · {question.ano} {question.edicao}</p>
+          <h3 className="mt-4 text-xl font-bold">
+  {question.objeto}
+</h3>
 
+<div className="mt-2 flex flex-wrap items-center gap-2">
+  <span className="text-sm font-medium text-slate-500">
+    {question.competencia}
+  </span>
+
+  <span className="text-sm font-medium text-slate-500">
+    {question.habilidade}
+  </span>
+
+  {question.dificuldade ? (
+    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+      {question.dificuldade}
+    </span>
+  ) : null}
+
+  {question.ano || question.edicao ? (
+    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+      {[question.ano, question.edicao]
+        .filter(Boolean)
+        .join(" · ")}
+    </span>
+  ) : null}
+
+  {question.funcao ? (
+    <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">
+      {question.funcao}
+    </span>
+  ) : null}
+</div>
           <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-indigo-700">

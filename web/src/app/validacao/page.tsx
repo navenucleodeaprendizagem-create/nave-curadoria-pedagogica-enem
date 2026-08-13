@@ -1,5 +1,5 @@
 import Link from "next/link";
-import ValidacaoCentralClient from "@/components/ValidacaoCentralClientV01113";
+import ValidacaoCentralClient from "@/components/ValidacaoCentralClientV011161";
 import { SYSTEM_VERSION } from "@/lib/system-version";
 import { requireNavePermission } from "@/lib/auth/require-nave-permission";
 

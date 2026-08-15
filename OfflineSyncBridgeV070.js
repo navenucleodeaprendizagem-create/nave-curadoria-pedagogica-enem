@@ -231,6 +231,41 @@ function doPost(e) {
     }
 
     /* =====================================================
+       V0.11.15 — FONTES PDF ORIGINAIS
+    ===================================================== */
+
+    if (
+      action ===
+      'getQuestionPdfSources'
+    ) {
+      const ss =
+        obterSpreadsheetOfflineSyncV070_();
+
+      const questionIds =
+        Array.isArray(body.questionIds)
+          ? body.questionIds
+          : Array.isArray(body.ids)
+            ? body.ids
+            : Array.isArray(body.idQuestoes)
+              ? body.idQuestoes
+              : [];
+
+      const sources =
+        obterFontesQuestoesOfflineV01115_(
+          ss,
+          questionIds
+        );
+
+      return respostaJsonOfflineSyncV070_({
+        ok: true,
+        action:
+          'getQuestionPdfSources',
+        sources: sources
+      });
+    }
+
+
+    /* =====================================================
        V0.11.11 — EDITORAÇÃO CENTRAL
     ===================================================== */
 
@@ -354,6 +389,139 @@ function doPost(e) {
     }
 
 
+    if (
+      action ===
+      'prepareEditorialPackage'
+    ) {
+      const ss =
+        obterSpreadsheetOfflineSyncV070_();
+
+      const contexto =
+        obterContextoUsuarioAutenticadoV090_(
+          body.emailAutenticacao,
+          body.idGoogle,
+          ss
+        );
+
+      const packageInfo =
+        prepararPacoteEditorialCentralV01120_(
+          ss,
+          contexto,
+          body.id || body.idEnvio
+        );
+
+      return respostaJsonOfflineSyncV070_({
+        ok: true,
+        action:
+          'prepareEditorialPackage',
+        packageInfo:
+          packageInfo
+      });
+    }
+
+
+    /* =====================================================
+       V0.12.20 — VALIDAÇÃO + COORDENAÇÃO CENTRAL
+    ===================================================== */
+
+    if (
+      [
+        'getValidationQuestion',
+        'submitCentralValidation',
+        'listCentralCoordinationCases',
+        'getCentralCoordinationCase',
+        'decideCentralCoordinationCase'
+      ].includes(action)
+    ) {
+      const ss =
+        obterSpreadsheetOfflineSyncV070_();
+
+      const contexto =
+        obterContextoUsuarioAutenticadoV090_(
+          body.emailAutenticacao,
+          body.idGoogle,
+          ss
+        );
+
+      if (
+        action ===
+        'getValidationQuestion'
+      ) {
+        return respostaJsonOfflineSyncV070_({
+          ok: true,
+          action: action,
+          question:
+            obterQuestaoValidacaoCentralV01220_(
+              ss,
+              contexto,
+              body.id
+            )
+        });
+      }
+
+      if (
+        action ===
+        'submitCentralValidation'
+      ) {
+        return respostaJsonOfflineSyncV070_({
+          ok: true,
+          action: action,
+          result:
+            registrarValidacaoCentralV01220_(
+              ss,
+              contexto,
+              body.validation
+            )
+        });
+      }
+
+      if (
+        action ===
+        'listCentralCoordinationCases'
+      ) {
+        const listagem =
+          listarCasosCoordenacaoCentralV01220_(
+            ss,
+            contexto
+          );
+
+        return respostaJsonOfflineSyncV070_({
+          ok: true,
+          action: action,
+          cases: listagem.cases,
+          indicadores: listagem.indicadores
+        });
+      }
+
+      if (
+        action ===
+        'getCentralCoordinationCase'
+      ) {
+        return respostaJsonOfflineSyncV070_({
+          ok: true,
+          action: action,
+          case:
+            obterCasoCoordenacaoCentralV01220_(
+              ss,
+              contexto,
+              body.id
+            )
+        });
+      }
+
+      return respostaJsonOfflineSyncV070_({
+        ok: true,
+        action: action,
+        result:
+          decidirCasoCoordenacaoCentralV01220_(
+            ss,
+            contexto,
+            body.decision
+          )
+      });
+    }
+
+
     /* =====================================================
        AÇÃO DESCONHECIDA
     ===================================================== */
@@ -429,6 +597,641 @@ function doPost(e) {
           : String(error)
     });
   }
+}
+
+
+/* =========================================================
+   V0.11.15 — FONTES PDF ORIGINAIS
+========================================================= */
+
+/**
+ * Resolve, em lote, a fonte PDF original das questões
+ * solicitadas pelo frontend.
+ *
+ * Estrutura esperada:
+ * - QUESTOES_GERAL:
+ *   id_ocorrencia, colecao_origem, area,
+ *   componente_principal, pagina_pdf, url_pdf_manual
+ *
+ * - FONTES_PDF:
+ *   colecao_origem, area, componente,
+ *   url_pdf, status_fonte, nome_publico
+ *
+ * Mantém a mesma prioridade usada pela resolução multiarea:
+ * 1. URL manual da própria questão;
+ * 2. coleção + área + componente;
+ * 3. coleção + área;
+ * 4. coleção isolada.
+ */
+function obterFontesQuestoesOfflineV01115_(
+  ss,
+  questionIds
+) {
+  const ids =
+    Array.from(
+      new Set(
+        (Array.isArray(questionIds)
+          ? questionIds
+          : [])
+          .map(function(id) {
+            return String(id || '').trim();
+          })
+          .filter(Boolean)
+      )
+    );
+
+  if (!ids.length) {
+    return [];
+  }
+
+  if (ids.length > 500) {
+    throw new Error(
+      'Quantidade máxima de questões por consulta de fontes: 500.'
+    );
+  }
+
+  const abaQuestoes =
+    ss.getSheetByName('QUESTOES_GERAL');
+
+  if (
+    !abaQuestoes ||
+    abaQuestoes.getLastRow() < 2
+  ) {
+    throw new Error(
+      'A aba QUESTOES_GERAL não foi encontrada ou está vazia.'
+    );
+  }
+
+  const dadosQuestoes =
+    abaQuestoes
+      .getDataRange()
+      .getValues();
+
+  const idxQ =
+    indexarFonteOfflineV01115_(
+      dadosQuestoes[0]
+    );
+
+  if (
+    idxQ.id_ocorrencia === undefined
+  ) {
+    throw new Error(
+      'Campo id_ocorrencia ausente em QUESTOES_GERAL.'
+    );
+  }
+
+  const idsAlvo =
+    new Set(ids);
+
+  const questoesPorId = {};
+
+  dadosQuestoes
+    .slice(1)
+    .forEach(function(linha) {
+      const id = String(
+        linha[idxQ.id_ocorrencia] || ''
+      ).trim();
+
+      if (
+        id &&
+        idsAlvo.has(id)
+      ) {
+        questoesPorId[id] = linha;
+      }
+    });
+
+  const catalogo =
+    carregarCatalogoFontesOfflineV01115_(
+      ss
+    );
+
+  return ids.map(function(idQuestao) {
+    const linha =
+      questoesPorId[idQuestao];
+
+    if (!linha) {
+      return {
+        idQuestao: idQuestao,
+        colecaoOrigem: '',
+        nomePublico: '',
+        paginaPdf: null,
+        urlPdf: '',
+        urlPagina: '',
+        disponivel: false,
+        motivo:
+          'Questão não localizada em QUESTOES_GERAL.'
+      };
+    }
+
+    const colecao =
+      valorFonteOfflineV01115_(
+        linha,
+        idxQ,
+        'colecao_origem'
+      );
+
+    const componente =
+      valorFonteOfflineV01115_(
+        linha,
+        idxQ,
+        'componente_principal'
+      );
+
+    const areaInformada =
+      valorFonteOfflineV01115_(
+        linha,
+        idxQ,
+        'area'
+      );
+
+    const area =
+      areaInformada ||
+      inferirAreaFonteOfflineV01115_(
+        idQuestao,
+        componente
+      );
+
+    const paginaPdf =
+      obterPaginaFonteOfflineV01115_(
+        linha,
+        idxQ
+      );
+
+    const urlManual =
+      valorFonteOfflineV01115_(
+        linha,
+        idxQ,
+        'url_pdf_manual'
+      );
+
+    if (urlManual) {
+      return {
+        idQuestao: idQuestao,
+        colecaoOrigem: colecao,
+        nomePublico:
+          colecao ||
+          'Fonte cadastrada manualmente',
+        paginaPdf: paginaPdf,
+        urlPdf: urlManual,
+        urlPagina:
+          construirUrlPaginaFonteOfflineV01115_(
+            urlManual,
+            paginaPdf
+          ),
+        disponivel: true,
+        motivo: ''
+      };
+    }
+
+    const fonte =
+      resolverFonteCatalogoOfflineV01115_(
+        catalogo,
+        colecao,
+        area,
+        componente
+      );
+
+    if (!fonte) {
+      return {
+        idQuestao: idQuestao,
+        colecaoOrigem: colecao,
+        nomePublico: '',
+        paginaPdf: paginaPdf,
+        urlPdf: '',
+        urlPagina: '',
+        disponivel: false,
+        motivo:
+          'Fonte não localizada para ' +
+          [
+            colecao || '?',
+            area || '?',
+            componente || '?'
+          ].join(' · ')
+      };
+    }
+
+    const disponivel =
+      Boolean(fonte.url) &&
+      normalizarFonteOfflineV01115_(
+        fonte.status
+      ) === 'disponivel';
+
+    return {
+      idQuestao: idQuestao,
+      colecaoOrigem: colecao,
+      nomePublico:
+        fonte.nome ||
+        colecao ||
+        '',
+      paginaPdf: paginaPdf,
+      urlPdf:
+        fonte.url || '',
+      urlPagina:
+        disponivel
+          ? construirUrlPaginaFonteOfflineV01115_(
+              fonte.url,
+              paginaPdf
+            )
+          : '',
+      disponivel: disponivel,
+      motivo:
+        disponivel
+          ? ''
+          : (
+              fonte.status ||
+              'Fonte sem URL disponível.'
+            )
+    };
+  });
+}
+
+
+function carregarCatalogoFontesOfflineV01115_(
+  ss
+) {
+  const aba =
+    ss.getSheetByName('FONTES_PDF');
+
+  if (
+    !aba ||
+    aba.getLastRow() < 2
+  ) {
+    return [];
+  }
+
+  const dados =
+    aba
+      .getDataRange()
+      .getValues();
+
+  const idx =
+    indexarFonteOfflineV01115_(
+      dados[0]
+    );
+
+  const obrigatorios = [
+    'colecao_origem',
+    'area',
+    'componente',
+    'url_pdf',
+    'status_fonte'
+  ];
+
+  const ausentes =
+    obrigatorios.filter(
+      function(campo) {
+        return idx[campo] === undefined;
+      }
+    );
+
+  if (ausentes.length) {
+    throw new Error(
+      'Campos ausentes em FONTES_PDF: ' +
+      ausentes.join(', ')
+    );
+  }
+
+  return dados
+    .slice(1)
+    .map(function(linha) {
+      return {
+        colecao:
+          normalizarFonteOfflineV01115_(
+            linha[idx.colecao_origem]
+          ),
+
+        area:
+          normalizarFonteOfflineV01115_(
+            linha[idx.area]
+          ),
+
+        componente:
+          normalizarComponenteFonteOfflineV01115_(
+            linha[idx.componente]
+          ),
+
+        url:
+          String(
+            linha[idx.url_pdf] || ''
+          ).trim(),
+
+        status:
+          String(
+            linha[idx.status_fonte] || ''
+          ).trim(),
+
+        nome:
+          idx.nome_publico === undefined
+            ? ''
+            : String(
+                linha[idx.nome_publico] || ''
+              ).trim()
+      };
+    })
+    .filter(function(item) {
+      return Boolean(item.colecao);
+    });
+}
+
+
+function resolverFonteCatalogoOfflineV01115_(
+  catalogo,
+  colecao,
+  area,
+  componente
+) {
+  const alvoColecao =
+    normalizarFonteOfflineV01115_(
+      colecao
+    );
+
+  const alvoArea =
+    normalizarFonteOfflineV01115_(
+      area
+    );
+
+  const alvoComponente =
+    normalizarComponenteFonteOfflineV01115_(
+      componente
+    );
+
+  let fonte =
+    catalogo.find(function(item) {
+      return (
+        item.colecao ===
+          alvoColecao &&
+        item.area ===
+          alvoArea &&
+        item.componente ===
+          alvoComponente
+      );
+    });
+
+  if (!fonte) {
+    fonte =
+      catalogo.find(function(item) {
+        return (
+          item.colecao ===
+            alvoColecao &&
+          item.area ===
+            alvoArea
+        );
+      });
+  }
+
+  if (!fonte) {
+    fonte =
+      catalogo.find(function(item) {
+        return (
+          item.colecao ===
+          alvoColecao
+        );
+      });
+  }
+
+  return fonte || null;
+}
+
+
+function obterPaginaFonteOfflineV01115_(
+  linha,
+  idx
+) {
+  const candidatos = [
+    'pagina_pdf',
+    'pagina',
+    'pagina_origem',
+    'page_pdf'
+  ];
+
+  for (
+    let i = 0;
+    i < candidatos.length;
+    i += 1
+  ) {
+    const campo =
+      candidatos[i];
+
+    if (
+      idx[campo] === undefined
+    ) {
+      continue;
+    }
+
+    const valor =
+      linha[idx[campo]];
+
+    if (
+      valor === '' ||
+      valor === null ||
+      valor === undefined
+    ) {
+      continue;
+    }
+
+    const numero =
+      Number(valor);
+
+    return Number.isFinite(numero)
+      ? numero
+      : String(valor).trim();
+  }
+
+  return null;
+}
+
+
+function construirUrlPaginaFonteOfflineV01115_(
+  urlPdf,
+  paginaPdf
+) {
+  const url =
+    String(urlPdf || '').trim();
+
+  if (!url) {
+    return '';
+  }
+
+  if (
+    paginaPdf === null ||
+    paginaPdf === undefined ||
+    String(paginaPdf).trim() === ''
+  ) {
+    return url;
+  }
+
+  const pagina =
+    String(paginaPdf).trim();
+
+  return (
+    url.replace(/#.*$/, '') +
+    '#page=' +
+    encodeURIComponent(pagina)
+  );
+}
+
+
+function indexarFonteOfflineV01115_(
+  headers
+) {
+  return headers.reduce(
+    function(mapa, header, i) {
+      const chave =
+        String(header || '').trim();
+
+      if (chave) {
+        mapa[chave] = i;
+      }
+
+      return mapa;
+    },
+    {}
+  );
+}
+
+
+function valorFonteOfflineV01115_(
+  linha,
+  idx,
+  campo
+) {
+  if (
+    idx[campo] === undefined
+  ) {
+    return '';
+  }
+
+  return String(
+    linha[idx[campo]] || ''
+  ).trim();
+}
+
+
+function normalizarFonteOfflineV01115_(
+  valor
+) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(
+      /[\u0300-\u036f]/g,
+      ''
+    )
+    .replace(
+      /\u00A0/g,
+      ' '
+    )
+    .replace(
+      /\s+/g,
+      ' '
+    )
+    .trim()
+    .toLowerCase();
+}
+
+
+function normalizarComponenteFonteOfflineV01115_(
+  valor
+) {
+  const v =
+    normalizarFonteOfflineV01115_(
+      valor
+    );
+
+  const aliases = {
+    'lingua portuguesa':
+      'portugues',
+    'portugues':
+      'portugues',
+    'historia':
+      'historia',
+    'geografia':
+      'geografia',
+    'filosofia':
+      'filosofia',
+    'sociologia':
+      'sociologia',
+    'matematica':
+      'matematica',
+    'quimica':
+      'quimica',
+    'fisica':
+      'fisica',
+    'biologia':
+      'biologia'
+  };
+
+  return aliases[v] || v;
+}
+
+
+function inferirAreaFonteOfflineV01115_(
+  id,
+  componente
+) {
+  const codigo =
+    String(id || '')
+      .toUpperCase();
+
+  if (/_CH_/.test(codigo)) {
+    return 'CH';
+  }
+
+  if (/_MT_/.test(codigo)) {
+    return 'MT';
+  }
+
+  if (/_LC_/.test(codigo)) {
+    return 'LC';
+  }
+
+  if (/_CN_/.test(codigo)) {
+    return 'CN';
+  }
+
+  const c =
+    normalizarComponenteFonteOfflineV01115_(
+      componente
+    );
+
+  if (
+    [
+      'quimica',
+      'fisica',
+      'biologia'
+    ].includes(c)
+  ) {
+    return 'CN';
+  }
+
+  if (
+    [
+      'historia',
+      'geografia',
+      'filosofia',
+      'sociologia'
+    ].includes(c)
+  ) {
+    return 'CH';
+  }
+
+  if (c === 'matematica') {
+    return 'MT';
+  }
+
+  if (
+    [
+      'portugues',
+      'literatura',
+      'lingua estrangeira moderna',
+      'educacao fisica',
+      'artes',
+      'tecnologias da comunicacao e informacao'
+    ].includes(c)
+  ) {
+    return 'LC';
+  }
+
+  return '';
 }
 
 

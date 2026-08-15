@@ -76,6 +76,10 @@ export default function ValidacaoCentralClient({
 }: ValidacaoCentralClientProps) {
   const messageRef = useRef<HTMLDivElement | null>(null);
   const formRef = useRef<HTMLDivElement | null>(null);
+  const submissionRef = useRef<{
+    fingerprint: string;
+    idOperacao: string;
+  } | null>(null);
   const [id, setId] = useState(initialQuestionId);
   const [question, setQuestion] = useState<ValidationQuestion | null>(null);
   const [pdfSource, setPdfSource] = useState<QuestionPdfSource | null>(null);
@@ -175,11 +179,36 @@ export default function ValidacaoCentralClient({
 
   async function save() {
     if (!question) return;
+
+    const fingerprint = JSON.stringify({
+      idQuestao: question.id,
+      versaoRegistroAvaliada: question.versaoRegistro,
+      ...form,
+    });
+
+    if (
+      !submissionRef.current ||
+      submissionRef.current.fingerprint !== fingerprint
+    ) {
+      submissionRef.current = {
+        fingerprint,
+        idOperacao: crypto.randomUUID(),
+      };
+    }
+
+    const {idOperacao} = submissionRef.current;
+
     try {
       setSaving(true); setMessage("");
-      const result = await submitCentralValidation({idQuestao:question.id, ...form});
+      const result = await submitCentralValidation({
+        idOperacao,
+        idQuestao:question.id,
+        versaoRegistroAvaliada:question.versaoRegistro,
+        ...form,
+      });
       setMessage(result?.mensagem || "Validação registrada.");
       if (result?.questao) setQuestion(result.questao);
+      submissionRef.current = null;
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Falha ao registrar.");
     } finally { setSaving(false); }

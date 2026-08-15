@@ -100,8 +100,22 @@ export async function POST(request: Request) {
     }
 
     if (operation === "submitValidation") {
+      const validation = body.validation;
+      const idOperacao =
+        validation &&
+        typeof validation === "object"
+          ? (validation as Record<string, unknown>).idOperacao
+          : null;
+
+      if (
+        typeof idOperacao !== "string" ||
+        !idOperacao.trim()
+      ) {
+        return json({ok:false, error:"idOperacao é obrigatório."}, 400);
+      }
+
       const result = await callAppsScript({
-        action:"submitCentralValidation", ...identity, validation:body.validation ?? {}
+        action:"submitCentralValidation", ...identity, validation
       });
       return json({ok:true, result:result.result ?? null});
     }

@@ -18,7 +18,9 @@ export type ValidationQuestion = {
 };
 
 export type ValidationForm = {
+  idOperacao: string;
   idQuestao: string;
+  versaoRegistroAvaliada: number;
   avaliacaoObjeto: string;
   objetoSugerido?: string;
   avaliacaoAcao: string;
@@ -80,6 +82,7 @@ type ApiResponse = {
     idQuestao?: string;
     camposAlterados?: string[];
     questao?: ValidationQuestion;
+    reutilizado?: boolean;
   };
   cases?: CoordinationCaseSummary[];
   case?: CoordinationCase;

@@ -31,6 +31,7 @@ const NAVE_BANCO_OFFLINE_V0111 = Object.freeze({
     'dificuldade_faixa',
     'ano',
     'edicao',
+    'gabarito_oficial',
     'funcao_pedagogica_sugerida',
     'tempo_estimado_min',
     'trecho_inicial',
@@ -338,6 +339,13 @@ function mapearQuestaoOfflineV0111_(
       textoBancoOfflineV0111_(
         linha[
           idx.edicao
+        ]
+      ),
+
+    gabaritoOficial:
+      textoBancoOfflineV0111_(
+        linha[
+          idx.gabarito_oficial
         ]
       ),
 

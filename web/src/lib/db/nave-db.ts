@@ -230,6 +230,8 @@ export interface NaveQuestionRecord {
   ano: string;
   edicao: string;
 
+  gabaritoOficial: string;
+
   funcaoPedagogica: string;
   tempoEstimadoMin: number;
 

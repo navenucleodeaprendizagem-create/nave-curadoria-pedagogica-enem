@@ -1360,6 +1360,14 @@ export default function SequenciasClient() {
                                                     "Função pedagógica não informada"
                                                   }
                                                 </span>
+
+                                                <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700">
+                                                  Gabarito:{" "}
+                                                  {
+                                                    question.gabaritoOficial ||
+                                                    "—"
+                                                  }
+                                                </span>
                                               </div>
 
                                               <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5">

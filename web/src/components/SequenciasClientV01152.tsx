@@ -17,18 +17,22 @@ import {
 } from "@/lib/sources/question-sources-api";
 
 import {
-  createEditorialJobFromSequence,
   deleteLocalSequence,
-  getAllEditorialJobs,
   getAllLocalSequences,
   getAllQuestions,
   getLocalSequenceItems,
   replaceLocalSequenceItems,
   updateLocalSequenceMetadata,
+  updateLocalSequenceStatus,
   type NaveQuestionRecord,
   type NaveSequenceItemRecord,
   type NaveSequenceRecord,
 } from "@/lib/db/nave-db";
+
+import {
+  createCentralEditorialJob,
+  getCentralEditorialActiveSequenceIds,
+} from "@/lib/editorial/editorial-api";
 
 type SequenceState =
   | {
@@ -270,12 +274,12 @@ export default function SequenciasClient() {
         const [
           sequences,
           questions,
-          editorialJobs,
+          activeEditorialIds,
         ] =
           await Promise.all([
             getAllLocalSequences(),
             getAllQuestions(),
-            getAllEditorialJobs(),
+            getCentralEditorialActiveSequenceIds(),
           ]);
 
         const nextQuestionsById =
@@ -293,20 +297,7 @@ export default function SequenciasClient() {
         );
 
         setActiveEditorialSequenceIds(
-          new Set(
-            editorialJobs
-              .filter(
-                (job) =>
-                  job.status ===
-                    "aguardando" ||
-                  job.status ===
-                    "em_producao"
-              )
-              .map(
-                (job) =>
-                  job.sequenceId
-              )
-          )
+          new Set(activeEditorialIds)
         );
 
         setState({
@@ -705,15 +696,56 @@ export default function SequenciasClient() {
 
       setActionMessage("");
 
-      await createEditorialJobFromSequence(
-        sequence.id
-      );
+      const items =
+        await getLocalSequenceItems(
+          sequence.id
+        );
+
+      if (items.length === 0) {
+        throw new Error(
+          "A sequência não possui questões para enviar à editoração."
+        );
+      }
+
+      const questionIds =
+        [...items]
+          .sort(
+            (a, b) =>
+              a.position -
+              b.position
+          )
+          .map(
+            (item) =>
+              item.questionId
+          );
+
+      await createCentralEditorialJob({
+        sequenceId:
+          sequence.id,
+        titulo:
+          sequence.titulo,
+        descricao:
+          sequence.descricao ?? "",
+        questionIds,
+      });
+
+      try {
+        if (
+          sequence.status !==
+          "pronta"
+        ) {
+          await updateLocalSequenceStatus(
+            sequence.id,
+            "pronta"
+          );
+        }
+      } finally {
+        await loadSequences();
+      }
 
       setActionMessage(
         `Sequência “${sequence.titulo}” enviada para editoração.`
       );
-
-      await loadSequences();
     } catch (error) {
       setActionMessage(
         error instanceof Error

@@ -21,6 +21,16 @@ function TextBlock({title, text}:{title:string; text?:string}) {
     <p className="mt-1 whitespace-pre-line text-sm leading-6 text-slate-700">{text}</p></div>;
 }
 
+function ListBlock({title, text}:{title:string; text?:string}) {
+  if (!text) return null;
+  const items = text.split(/[;\n]+/).map((item) => item.trim()).filter(Boolean);
+  if (items.length < 2) return <TextBlock title={title} text={text} />;
+  return <div><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-teal-700">{title}</h4>
+    <ul className="mt-2 space-y-1.5 text-sm leading-6 text-slate-700">{items.map((item, index) => (
+      <li key={`${index}-${item}`} className="flex gap-2"><span aria-hidden="true" className="text-teal-600">•</span><span>{item}</span></li>
+    ))}</ul></div>;
+}
+
 export default function OrientationClient({id}:{id:string}) {
   const [data, setData] = useState<PedagogicalOrientation | null>(null);
   const [error, setError] = useState("");
@@ -83,12 +93,13 @@ export default function OrientationClient({id}:{id:string}) {
             <TextBlock title="Habilidade" text={skill.descricaoHabilidade} />
             <div><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-teal-700">Recorrência no ENEM</h4>
               <p className="mt-1 text-sm leading-6 text-slate-700">{data.historicoEnemDisponivel ? `${skill.recorrencia.quantidadeItens2016_2025} itens · média da área ${skill.recorrencia.mediaArea} · posição ${skill.recorrencia.posicaoNaArea} de ${skill.recorrencia.totalHabilidadesArea} · ${skill.recorrencia.recorrencia}` : "Base analítica ENEM 2016–2025 ainda não conectada."}</p></div>
-            <TextBlock title="Verbo / operação cognitiva" text={p?.operacaoCognitiva} />
+            <TextBlock title="Verbo central" text={p?.verboCentral} />
+            <TextBlock title="Operação cognitiva" text={p?.operacaoCognitiva} />
             <TextBlock title="Interpretação pedagógica" text={p?.interpretacaoPedagogica} />
-            <TextBlock title="Expectativa de aprendizagem" text={p?.expectativaAprendizagem} />
-            <TextBlock title="Evidências de domínio" text={p?.evidenciasDominio} />
-            <TextBlock title="Dificuldades frequentes" text={p?.dificuldadesFrequentes} />
-            <TextBlock title="Perguntas de mediação" text={p?.perguntasDiagnosticas} />
+            <ListBlock title="Expectativa de aprendizagem" text={p?.expectativaAprendizagem} />
+            <ListBlock title="Evidências de domínio" text={p?.evidenciasDominio} />
+            <ListBlock title="Dificuldades frequentes" text={p?.dificuldadesFrequentes} />
+            <ListBlock title="Perguntas de mediação" text={p?.perguntasDiagnosticas} />
           </div>
           {hasHow ? <div className="mt-6 rounded-2xl bg-slate-50 p-5"><h4 className="font-bold">Como trabalhar</h4><div className="mt-3 grid gap-4 md:grid-cols-3">
             <TextBlock title="Antes da questão" text={p?.antesDaQuestao} /><TextBlock title="Durante" text={p?.duranteAQuestao} /><TextBlock title="Depois" text={p?.depoisDaQuestao} />

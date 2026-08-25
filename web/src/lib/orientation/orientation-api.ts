@@ -17,6 +17,7 @@ export type OrientationQuestion = {
 export type OrientationPedagogy = {
   descricaoCompetencia: string;
   descricaoHabilidade: string;
+  verboCentral: string;
   operacaoCognitiva: string;
   interpretacaoPedagogica: string;
   expectativaAprendizagem: string;

@@ -12,10 +12,19 @@ const MATRIZ_ENEM_PEDAGOGICA_V01320 = Object.freeze({
     'descricao_competencia',
     'habilidade',
     'descricao_habilidade',
+    'verbo_central',
     'interpretacao_pedagogica',
     'operacao_cognitiva',
     'expectativa_aprendizagem',
+    'evidencias_de_dominio',
     'dificuldades_frequentes',
+    'perguntas_diagnosticas',
+    'antes_da_questao',
+    'durante_a_questao',
+    'depois_da_questao',
+    'retomada',
+    'mediacao',
+    'consolidacao',
     'orientacoes_intervencao',
     'versao',
     'revisado_por',
@@ -44,11 +53,26 @@ function garantirMatrizEnemPedagogicaV01320_(ss) {
     .getDisplayValues()[0]
     .map(function(x) { return String(x || '').trim(); });
 
-  if (
-    atuais.length !== esperados.length ||
-    esperados.some(function(h, i) { return atuais[i] !== h; })
-  ) {
-    throw new Error('Schema incompatível em MATRIZ_ENEM_PEDAGOGICA.');
+  const duplicados = atuais.filter(function(header, indice) {
+    return header && atuais.indexOf(header) !== indice;
+  });
+  if (duplicados.length) {
+    throw new Error('Cabeçalhos duplicados em MATRIZ_ENEM_PEDAGOGICA: ' +
+      Array.from(new Set(duplicados)).join(', '));
+  }
+  const desconhecidos = atuais.filter(function(header) {
+    return header && !esperados.includes(header);
+  });
+  if (desconhecidos.length) {
+    throw new Error('Colunas não reconhecidas em MATRIZ_ENEM_PEDAGOGICA: ' +
+      desconhecidos.join(', '));
+  }
+  const ausentes = esperados.filter(function(header) {
+    return !atuais.includes(header);
+  });
+  if (ausentes.length) {
+    aba.getRange(1, aba.getLastColumn() + 1, 1, ausentes.length)
+      .setValues([ausentes]);
   }
 
   return aba;

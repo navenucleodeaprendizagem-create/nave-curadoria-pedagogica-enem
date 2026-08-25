@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   useCallback,
@@ -33,6 +33,8 @@ import {
   createCentralEditorialJob,
   getCentralEditorialActiveSequenceIds,
 } from "@/lib/editorial/editorial-api";
+
+import { createOrUpdatePedagogicalActivity } from "@/lib/orientation/orientation-api";
 
 type SequenceState =
   | {
@@ -143,6 +145,7 @@ function openOriginalPdf(
 }
 
 export default function SequenciasClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const sequenceFromValidation = searchParams.get("sequencia");
   const [state, setState] =
@@ -211,6 +214,11 @@ export default function SequenciasClient() {
     setActionMessage,
   ] =
     useState("");
+
+  const [
+    preparingOrientationSequenceId,
+    setPreparingOrientationSequenceId,
+  ] = useState<string | null>(null);
 
   const [
     editingSequenceId,
@@ -759,6 +767,36 @@ export default function SequenciasClient() {
     }
   }
 
+  async function handleOpenOrientation(
+    sequence: NaveSequenceRecord
+  ) {
+    try {
+      setPreparingOrientationSequenceId(sequence.id);
+      setActionMessage("");
+      const items = await getLocalSequenceItems(sequence.id);
+      if (items.length === 0) {
+        throw new Error("A sequência não possui questões para orientação pedagógica.");
+      }
+      const questionIds = [...items]
+        .sort((a, b) => a.position - b.position)
+        .map((item) => item.questionId);
+      const snapshot = await createOrUpdatePedagogicalActivity({
+        idAtividade: sequence.id,
+        titulo: sequence.titulo,
+        descricao: sequence.descricao ?? "",
+        questionIds,
+      });
+      router.push(`/orientacao/${encodeURIComponent(snapshot.idAtividade)}`);
+    } catch (error) {
+      setActionMessage(
+        error instanceof Error
+          ? error.message
+          : "Falha ao preparar a orientação pedagógica."
+      );
+      setPreparingOrientationSequenceId(null);
+    }
+  }
+
   async function handleDelete(
     sequence: NaveSequenceRecord
   ) {
@@ -990,6 +1028,17 @@ export default function SequenciasClient() {
                     </div>
 
                     <div className="flex shrink-0 flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenOrientation(sequence)}
+                        disabled={preparingOrientationSequenceId === sequence.id}
+                        className="rounded-xl border border-teal-200 bg-white px-4 py-2.5 text-sm font-bold text-teal-800 shadow-sm transition hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {preparingOrientationSequenceId === sequence.id
+                          ? "Preparando orientação..."
+                          : "Orientação pedagógica"}
+                      </button>
+
                       <button
                         type="button"
                         onClick={() =>

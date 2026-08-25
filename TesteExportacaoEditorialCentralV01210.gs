@@ -38,6 +38,24 @@ function testeExportarPacoteQuimicaFinalV01210() {
 }
 
 
+function testeExportarPacoteQuimicaFinalLiberadoV01210() {
+  const ss = obterSpreadsheetOfflineSyncV070_();
+  const contexto = obterContextoTesteManualExportacaoCentralV01210_(ss);
+
+  const resultado = gerarCsvEditorialCentralV01210_(
+    ss,
+    {
+      idProjeto: 'PEC_A4E00634-A214-4438-B0BD-C8CB4378A224'
+    },
+    'FINAL',
+    contexto
+  );
+
+  Logger.log(JSON.stringify(resultado, null, 2));
+  return resultado;
+}
+
+
 function obterContextoTesteManualExportacaoCentralV01210_(ss) {
   const emailAtivo = normalizarEmailIdentidadeNaveV091_(
     Session.getActiveUser().getEmail()

@@ -509,24 +509,16 @@ export default function EditoracaoClient() {
 
                         {job.status ===
                         "concluido" ? (
-                          <button
-                            type="button"
-                            disabled={
-                              preparingPackageJobId ===
-                              job.id
-                            }
-                            onClick={() =>
-                              void preparePackage(
-                                job
-                              )
-                            }
-                            className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {preparingPackageJobId ===
-                            job.id
-                              ? "Preparando..."
-                              : "Preparar pacote"}
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              disabled={preparingPackageJobId === job.id}
+                              onClick={() => void preparePackage(job)}
+                              className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {preparingPackageJobId === job.id ? "Preparando..." : "Preparar pacote"}
+                            </button>
+                          </>
                         ) : null}
 
                         {job.status ===

@@ -619,6 +619,10 @@ function montarPacoteCentralV01120_(
         job.titulo,
       descricao:
         job.descricao,
+      professor:
+        textoPacoteCentralV01120_(
+          job.professorNome
+        ),
       questionIds:
         questionIds.slice(),
       quantidadeQuestoes:
@@ -833,6 +837,12 @@ function obterPacoteCentralPorEnvioV01120_(
       textoPacoteCentralV01120_(
         linha[idx.descricao]
       ),
+    professor:
+      idx.professor === undefined
+        ? ''
+        : textoPacoteCentralV01120_(
+            linha[idx.professor]
+          ),
     questionIds:
       questionIds,
     quantidadeQuestoes:
@@ -1063,23 +1073,33 @@ function persistirPacoteCentralV01120_(
     );
   }
 
-  aba.appendRow([
-    pacote.idEnvio,
-    pacote.idProjeto,
-    pacote.idSequencia,
-    pacote.titulo,
-    pacote.descricao,
-    JSON.stringify(
-      pacote.questionIds
-    ),
-    pacote.quantidadeQuestoes,
-    pacote.fontesIncompletas,
-    pacote.gabaritosIncompletos,
-    pacote.itensNaoLiberados,
-    pacote.statusPacote,
-    pacote.criadoEm,
-    pacote.criadoPor
-  ]);
+  const cabecalhos = aba
+    .getRange(1, 1, 1, aba.getLastColumn())
+    .getDisplayValues()[0];
+  const valores = {
+    id_envio: pacote.idEnvio,
+    id_projeto: pacote.idProjeto,
+    id_sequencia: pacote.idSequencia,
+    titulo: pacote.titulo,
+    descricao: pacote.descricao,
+    ids_questoes_json: JSON.stringify(pacote.questionIds),
+    quantidade_questoes: pacote.quantidadeQuestoes,
+    fontes_incompletas: pacote.fontesIncompletas,
+    gabaritos_incompletos: pacote.gabaritosIncompletos,
+    itens_nao_liberados: pacote.itensNaoLiberados,
+    status_pacote: pacote.statusPacote,
+    criado_em: pacote.criadoEm,
+    criado_por: pacote.criadoPor,
+    professor: textoPacoteCentralV01120_(pacote.professor)
+  };
+
+  aba.appendRow(
+    cabecalhos.map(function(cabecalho) {
+      return Object.prototype.hasOwnProperty.call(valores, cabecalho)
+        ? valores[cabecalho]
+        : '';
+    })
+  );
 }
 
 
@@ -1135,13 +1155,36 @@ function lerItensPorEnvioPacoteCentralV01120_(
 function garantirAbaPacotesCentraisV01120_(
   ss
 ) {
-  return garantirAbaPacoteCentralV01120_(
+  const aba = garantirAbaPacoteCentralV01120_(
     ss,
     NAVE_PACOTE_EDITORIAL_CENTRAL_V01120
       .ABA_PACOTES,
     NAVE_PACOTE_EDITORIAL_CENTRAL_V01120
       .CABECALHOS_PACOTES
   );
+
+  const headers = aba.getRange(
+    1,
+    1,
+    1,
+    Math.max(aba.getLastColumn(), 1)
+  ).getDisplayValues()[0].map(textoPacoteCentralV01120_);
+
+  const ocorrencias = headers.filter(function(header) {
+    return header === 'professor';
+  }).length;
+
+  if (ocorrencias > 1) {
+    throw new Error(
+      'Campo professor duplicado em PACOTES_EDITORIAIS_CENTRAIS.'
+    );
+  }
+
+  if (!ocorrencias) {
+    aba.getRange(1, aba.getLastColumn() + 1).setValue('professor');
+  }
+
+  return aba;
 }
 
 

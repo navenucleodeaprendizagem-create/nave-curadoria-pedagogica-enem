@@ -523,6 +523,63 @@ function doPost(e) {
 
 
     /* =====================================================
+       V0.14.00 — ORIENTAÇÃO PEDAGÓGICA
+    ===================================================== */
+
+    if (
+      action ===
+      'upsertPedagogicalActivity'
+    ) {
+      const ss =
+        obterSpreadsheetOfflineSyncV070_();
+
+      const contexto =
+        obterContextoUsuarioAutenticadoV090_(
+          body.emailAutenticacao,
+          body.idGoogle,
+          ss
+        );
+
+      return respostaJsonOfflineSyncV070_({
+        ok: true,
+        action: action,
+        snapshot:
+          salvarAtividadePedagogicaCentralV01400_(
+            ss,
+            contexto,
+            body.activity
+          )
+      });
+    }
+
+    if (
+      action ===
+      'getPedagogicalOrientation'
+    ) {
+      const ss =
+        obterSpreadsheetOfflineSyncV070_();
+
+      const contexto =
+        obterContextoUsuarioAutenticadoV090_(
+          body.emailAutenticacao,
+          body.idGoogle,
+          ss
+        );
+
+      return respostaJsonOfflineSyncV070_({
+        ok: true,
+        action: action,
+        orientation:
+          obterOrientacaoPedagogicaCentralV01400_(
+            ss,
+            contexto,
+            body.id || body.idAtividade
+          )
+      });
+    }
+
+
+    /* =====================================================
        AÇÃO DESCONHECIDA
     ===================================================== */
 

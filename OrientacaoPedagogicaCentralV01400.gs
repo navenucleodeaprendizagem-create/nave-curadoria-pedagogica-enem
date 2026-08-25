@@ -17,6 +17,23 @@ const FREQUENCIA_HABILIDADES_HEADERS_V01400_ = [
   'area', 'habilidade', 'quantidade_itens_validos_2016_2025',
   'periodo_inicio', 'periodo_fim', 'fonte', 'gerado_em'
 ];
+const CAMPOS_QUESTOES_ORIENTACAO_V01400_ = Object.freeze({
+  id_ocorrencia: Object.freeze({ nomes: ['id_ocorrencia'], obrigatorio: true }),
+  id_canonico: Object.freeze({ nomes: ['id_canonico'], obrigatorio: true }),
+  componente: Object.freeze({ nomes: ['componente_principal'], obrigatorio: true }),
+  competencia: Object.freeze({ nomes: ['competencia'], obrigatorio: true }),
+  habilidade: Object.freeze({ nomes: ['habilidade'], obrigatorio: true }),
+  objeto_principal: Object.freeze({ nomes: ['objeto_principal'], obrigatorio: true }),
+  acao_cognitiva: Object.freeze({ nomes: ['acao_cognitiva_especifica'], obrigatorio: true }),
+  dificuldade: Object.freeze({ nomes: ['dificuldade_rotulo'], obrigatorio: true }),
+  funcao_pedagogica: Object.freeze({ nomes: ['funcao_pedagogica_sugerida'], obrigatorio: true }),
+  tempo_estimado_min: Object.freeze({ nomes: ['tempo_estimado_min'], obrigatorio: true }),
+  gabarito_oficial: Object.freeze({ nomes: ['gabarito_oficial'], obrigatorio: true }),
+  ano: Object.freeze({ nomes: ['ano'], obrigatorio: true }),
+  edicao: Object.freeze({ nomes: ['edicao'], obrigatorio: true }),
+  status_validacao: Object.freeze({ nomes: ['status_validacao'], obrigatorio: true }),
+  maturidade_curadoria: Object.freeze({ nomes: ['maturidade_curadoria'], obrigatorio: true })
+});
 
 function salvarAtividadePedagogicaCentralV01400_(ss, contexto, entrada) {
   validarPermissaoSequenciasV01111_(contexto);
@@ -295,10 +312,7 @@ function lerBaseOrientacaoV01400_(ss) {
   const aba = ss.getSheetByName('QUESTOES_GERAL');
   if (!aba || aba.getLastRow() < 2) throw new Error('QUESTOES_GERAL não está disponível.');
   const dados = aba.getDataRange().getValues();
-  const idx = indexarOrientacaoV01400_(dados[0]);
-  ['id_ocorrencia', 'area', 'competencia', 'habilidade', 'ano'].forEach(function(campo) {
-    if (idx[campo] === undefined) throw new Error('Coluna ausente em QUESTOES_GERAL: ' + campo);
-  });
+  const idx = resolverCamposQuestoesOrientacaoV01400_(dados[0]);
   const porId = new Map();
   const duplicados = new Set();
   dados.slice(1).forEach(function(linha) {
@@ -310,6 +324,39 @@ function lerBaseOrientacaoV01400_(ss) {
     throw new Error('IDs duplicados em QUESTOES_GERAL: ' + Array.from(duplicados).slice(0, 20).join(', '));
   }
   return { linhas: dados.slice(1), idx: idx, porId: porId };
+}
+
+function resolverCamposQuestoesOrientacaoV01400_(headers) {
+  const posicoes = {};
+  (headers || []).forEach(function(header, indice) {
+    const nome = textoOrientacaoV01400_(header);
+    if (!nome) return;
+    if (!posicoes[nome]) posicoes[nome] = [];
+    posicoes[nome].push(indice);
+  });
+  const resolvido = {};
+  Object.keys(CAMPOS_QUESTOES_ORIENTACAO_V01400_).forEach(function(campo) {
+    const contrato = CAMPOS_QUESTOES_ORIENTACAO_V01400_[campo];
+    const candidatos = [];
+    contrato.nomes.forEach(function(nome) {
+      (posicoes[nome] || []).forEach(function(indice) {
+        candidatos.push({ nome: nome, indice: indice });
+      });
+    });
+    if (candidatos.length > 1) {
+      throw new Error('Colunas ambíguas em QUESTOES_GERAL para ' + campo + ': ' +
+        candidatos.map(function(item) { return item.nome; }).join(', '));
+    }
+    if (!candidatos.length) {
+      if (contrato.obrigatorio) {
+        throw new Error('Coluna ausente em QUESTOES_GERAL para ' + campo +
+          '. Nomes aceitos: ' + contrato.nomes.join(', '));
+      }
+      return;
+    }
+    resolvido[campo] = candidatos[0].indice;
+  });
+  return resolvido;
 }
 
 
@@ -327,20 +374,32 @@ function montarItemOrientacaoV01400_(linha, idx, ordem) {
   return {
     id: textoOrientacaoV01400_(valor('id_ocorrencia')),
     ordem: ordem,
-    area: textoOrientacaoV01400_(valor('area')),
-    componente: textoOrientacaoV01400_(valor('componente_principal', 'componente')),
+    area: derivarAreaIdCanonicoOrientacaoV01400_(valor('id_canonico')),
+    componente: textoOrientacaoV01400_(valor('componente')),
     competencia: textoOrientacaoV01400_(valor('competencia')),
     habilidade: textoOrientacaoV01400_(valor('habilidade')),
     objetoPrincipal: textoOrientacaoV01400_(valor('objeto_principal')),
     acaoCognitiva: textoOrientacaoV01400_(valor('acao_cognitiva')),
-    dificuldade: textoOrientacaoV01400_(valor('dificuldade_rotulo', 'dificuldade')),
-    funcaoPedagogica: textoOrientacaoV01400_(valor('funcao_pedagogica_sugerida', 'funcao_pedagogica')),
+    dificuldade: textoOrientacaoV01400_(valor('dificuldade')),
+    funcaoPedagogica: textoOrientacaoV01400_(valor('funcao_pedagogica')),
     tempoEstimadoMin: Number(valor('tempo_estimado_min')) || 0,
     gabaritoOficial: textoOrientacaoV01400_(valor('gabarito_oficial')),
     ano: textoOrientacaoV01400_(valor('ano')),
     edicao: textoOrientacaoV01400_(valor('edicao')),
     consolidada: liberacao === 'Liberada' || liberacao === 'Liberada com revisão'
   };
+}
+
+function derivarAreaIdCanonicoOrientacaoV01400_(idCanonico) {
+  const id = textoOrientacaoV01400_(idCanonico).toUpperCase();
+  const importado = id.match(/^CAN_(CN|CH|LC|MT)(?:_|$)/);
+  const manual = id.match(/^CAN_MAN_(CN|CH|LC|MT)(?:_|$)/);
+  const area = importado ? importado[1] : (manual ? manual[1] : '');
+  if (!area) {
+    throw new Error('id_canonico ausente ou inválido para derivação da área: ' +
+      (id || '[vazio]'));
+  }
+  return area;
 }
 
 
@@ -350,11 +409,7 @@ function determinarLiberacaoOrientacaoV01400_(status, maturidade) {
       ['Importada', 'Com divergência', 'Em validação', 'Suspensa'].includes(maturidade)) {
     return 'Bloqueada';
   }
-  if (['Homologada', 'Validada por docente', 'Validada por docentes'].includes(status) ||
-      ['Homologada', 'Validada por docente'].includes(maturidade)) return 'Liberada';
-  if (['Divergência resolvida', 'Resolvida pela coordenação'].includes(status) ||
-      maturidade === 'Ajustada pela coordenação') return 'Liberada com revisão';
-  return 'Bloqueada';
+  return determinarLiberacaoPacoteCentralV01120_(status, maturidade);
 }
 
 

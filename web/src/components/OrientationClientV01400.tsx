@@ -84,37 +84,66 @@ export default function OrientationClient({id}:{id:string}) {
         const hasHow = Boolean(p?.antesDaQuestao || p?.duranteAQuestao || p?.depoisDaQuestao);
         const hasIntervention = Boolean(p?.retomada || p?.mediacao || p?.consolidacao || p?.orientacoesIntervencao);
         return <article key={`${skill.area}-${skill.competencia}-${skill.habilidade}`} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3"><div>
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="text-sm font-bold text-teal-700">{skill.area} · {skill.componente}</p>
-            <h3 className="mt-1 text-2xl font-bold">{skill.competencia} · {skill.habilidade}</h3>
-          </div><span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">Questões {skill.questoes.join(", ")}</span></div>
-          <div className="mt-5 grid gap-5 lg:grid-cols-2">
-            <TextBlock title="Competência" text={skill.descricaoCompetencia} />
-            <TextBlock title="Habilidade" text={skill.descricaoHabilidade} />
-            <div><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-teal-700">Recorrência no ENEM</h4>
-              <p className="mt-1 text-sm leading-6 text-slate-700">{data.historicoEnemDisponivel ? `${skill.recorrencia.quantidadeItens2016_2025} itens · média da área ${skill.recorrencia.mediaArea} · posição ${skill.recorrencia.posicaoNaArea} de ${skill.recorrencia.totalHabilidadesArea} · ${skill.recorrencia.recorrencia}` : "Base analítica ENEM 2016–2025 ainda não conectada."}</p></div>
-            <TextBlock title="Verbo central" text={p?.verboCentral} />
-            <TextBlock title="Operação cognitiva" text={p?.operacaoCognitiva} />
-            <TextBlock title="Interpretação pedagógica" text={p?.interpretacaoPedagogica} />
-            <ListBlock title="Expectativa de aprendizagem" text={p?.expectativaAprendizagem} />
-            <ListBlock title="Evidências de domínio" text={p?.evidenciasDominio} />
-            <ListBlock title="Dificuldades frequentes" text={p?.dificuldadesFrequentes} />
-            <ListBlock title="Perguntas de mediação" text={p?.perguntasDiagnosticas} />
+            <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-800">Questões {skill.questoes.join(", ")}</span>
           </div>
-          {hasHow ? <div className="mt-6 rounded-2xl bg-slate-50 p-5"><h4 className="font-bold">Como trabalhar</h4><div className="mt-3 grid gap-4 md:grid-cols-3">
-            <TextBlock title="Antes da questão" text={p?.antesDaQuestao} /><TextBlock title="Durante" text={p?.duranteAQuestao} /><TextBlock title="Depois" text={p?.depoisDaQuestao} />
-          </div></div> : null}
-          {hasIntervention ? <div className="mt-4 rounded-2xl bg-teal-50/60 p-5"><h4 className="font-bold">Intervenção</h4><div className="mt-3 grid gap-4 md:grid-cols-3">
-            <TextBlock title="Retomada" text={p?.retomada} /><TextBlock title="Mediação" text={p?.mediacao} /><TextBlock title="Consolidação" text={p?.consolidacao} />
-          </div><TextBlock title="Orientações aprovadas" text={p?.orientacoesIntervencao} /></div> : null}
-          {!p ? <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Conteúdo pedagógico aprovado ainda não cadastrado para esta habilidade.</p> : null}
-          <div className="mt-6"><h4 className="font-bold">Questões da atividade</h4><div className="mt-3 grid gap-3 lg:grid-cols-2">{skill.itens.map((item) => <div key={item.ordem} className="rounded-2xl border border-slate-200 p-4">
+
+          <section className="mt-6">
+            <h3 className="text-lg font-bold text-slate-950">Matriz ENEM</h3>
+            <div className="mt-4 space-y-5">
+              <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-teal-700">Competência {skill.competencia}</p><p className="mt-1 text-sm leading-6 text-slate-700">{skill.descricaoCompetencia || "Descrição oficial ainda não cadastrada."}</p></div>
+              <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-teal-700">Habilidade {skill.habilidade}</p><p className="mt-1 text-sm leading-6 text-slate-700">{skill.descricaoHabilidade || "Descrição oficial ainda não cadastrada."}</p></div>
+            </div>
+          </section>
+
+          <section className="mt-6 rounded-2xl border border-teal-100 bg-teal-50/60 px-5 py-4">
+            <h3 className="text-xs font-bold uppercase tracking-[0.12em] text-teal-800">Presença no ENEM 2016–2025</h3>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-800">{data.historicoEnemDisponivel ? `${skill.recorrencia.quantidadeItens2016_2025} itens | média ${skill.area} ${skill.recorrencia.mediaArea} | ${skill.recorrencia.posicaoNaArea}ª de ${skill.recorrencia.totalHabilidadesArea} | ${skill.recorrencia.recorrencia} recorrência` : "Frequência histórica indisponível."}</p>
+          </section>
+
+          {p ? <>
+            <section className="mt-7 border-t border-slate-100 pt-6">
+              <h3 className="text-lg font-bold text-slate-950">O que esta habilidade exige do estudante</h3>
+              <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 rounded-2xl bg-slate-50 px-5 py-4">
+                <TextBlock title="Verbo central" text={p.verboCentral} />
+                <TextBlock title="Operação cognitiva" text={p.operacaoCognitiva} />
+              </div>
+              <div className="mt-5"><TextBlock title="Interpretação pedagógica" text={p.interpretacaoPedagogica} /></div>
+            </section>
+
+            <section className="mt-7 border-t border-slate-100 pt-6">
+              <h3 className="text-lg font-bold text-slate-950">O que esperar do estudante</h3>
+              <div className="mt-4 grid gap-6 md:grid-cols-2">
+                <ListBlock title="Expectativa de aprendizagem" text={p.expectativaAprendizagem} />
+                <ListBlock title="Evidências de domínio" text={p.evidenciasDominio} />
+              </div>
+            </section>
+
+            <section className="mt-7 border-t border-slate-100 pt-6">
+              <h3 className="text-lg font-bold text-slate-950">Onde pode haver dificuldade</h3>
+              <div className="mt-4 grid gap-6 md:grid-cols-2">
+                <ListBlock title="Dificuldades frequentes" text={p.dificuldadesFrequentes} />
+                <ListBlock title="Perguntas para mediação" text={p.perguntasDiagnosticas} />
+              </div>
+            </section>
+
+            {hasHow ? <section className="mt-7 border-t border-slate-100 pt-6"><h3 className="text-lg font-bold text-slate-950">Como conduzir a atividade</h3><div className="mt-4 grid gap-4 md:grid-cols-3">
+              <GuidanceCard title="Antes" text={p.antesDaQuestao} /><GuidanceCard title="Durante" text={p.duranteAQuestao} /><GuidanceCard title="Depois" text={p.depoisDaQuestao} />
+            </div></section> : null}
+
+            {hasIntervention ? <section className="mt-7 border-t border-slate-100 pt-6"><h3 className="text-lg font-bold text-slate-950">Intervenção pedagógica</h3><div className="mt-4 grid gap-4 md:grid-cols-3">
+              <GuidanceCard title="Retomada" text={p.retomada} /><GuidanceCard title="Mediação" text={p.mediacao} /><GuidanceCard title="Consolidação" text={p.consolidacao} />
+            </div>{p.orientacoesIntervencao ? <div className="mt-5"><TextBlock title="Orientações aprovadas" text={p.orientacoesIntervencao} /></div> : null}</section> : null}
+          </> : <p className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Conteúdo pedagógico aprovado ainda não cadastrado para esta habilidade.</p>}
+
+          <section className="mt-7 border-t border-slate-100 pt-6"><h3 className="text-lg font-bold text-slate-950">Questões da atividade</h3><div className="mt-4 grid gap-3 lg:grid-cols-2">{skill.itens.map((item) => <div key={item.ordem} className="rounded-2xl border border-slate-200 p-4">
             <p className="font-bold">Questão {item.ordem}</p><dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm text-slate-700">
               <dt className="font-semibold">Objeto</dt><dd>{item.objetoPrincipal || "—"}</dd><dt className="font-semibold">Ação</dt><dd>{item.acaoCognitiva || "—"}</dd>
               <dt className="font-semibold">Dificuldade</dt><dd>{item.dificuldade || "—"}</dd><dt className="font-semibold">Função</dt><dd>{item.funcaoPedagogica || "—"}</dd>
               <dt className="font-semibold">Tempo</dt><dd>{item.tempoEstimadoMin || "—"} min</dd><dt className="font-semibold">Gabarito</dt><dd>{item.gabaritoOficial || "—"}</dd>
               <dt className="font-semibold">Ano / edição</dt><dd>{[item.ano,item.edicao].filter(Boolean).join(" / ") || "—"}</dd>
-            </dl></div>)}</div></div>
+            </dl></div>)}</div></section>
         </article>;
       })}
     </section>
@@ -122,7 +151,7 @@ export default function OrientationClient({id}:{id:string}) {
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><h2 className="text-xl font-bold">3. Síntese para o professor</h2>
       <div className="mt-4 grid gap-4 md:grid-cols-2"><Metric label="Habilidades mais presentes" value={data.sintese.habilidadesMaisPresentes.join(", ") || "—"} />
         <Metric label="Maior recorrência histórica" value={data.sintese.habilidadesMaiorRecorrencia.join(", ") || "—"} />
-        <Metric label="Operações cognitivas" value={data.sintese.operacoesCognitivas.join(", ") || "—"} />
+        <Metric label="Ações cognitivas das questões" value={data.sintese.operacoesCognitivas.join(", ") || "—"} />
         <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-bold uppercase text-slate-500">Distribuições</p><div className="mt-2"><Counts values={data.sintese.dificuldades} /></div><div className="mt-2"><Counts values={data.sintese.funcoesPedagogicas} /></div></div>
       </div></section>
   </div>;
@@ -130,4 +159,12 @@ export default function OrientationClient({id}:{id:string}) {
 
 function Metric({label,value}:{label:string;value:string}) {
   return <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-bold uppercase tracking-[0.08em] text-slate-500">{label}</p><p className="mt-1 font-semibold text-slate-900">{value}</p></div>;
+}
+
+function GuidanceCard({title,text}:{title:string;text?:string}) {
+  if (!text) return null;
+  return <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+    <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-teal-700">{title}</h4>
+    <p className="mt-2 text-sm leading-6 text-slate-700">{text}</p>
+  </div>;
 }

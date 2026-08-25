@@ -4,6 +4,7 @@ import {useEffect, useState} from "react";
 import {
   getPedagogicalOrientation,
   type OrientationCount,
+  type OrientationPedagogy,
   type PedagogicalOrientation,
 } from "@/lib/orientation/orientation-api";
 
@@ -29,6 +30,31 @@ function ListBlock({title, text}:{title:string; text?:string}) {
     <ul className="mt-2 space-y-1.5 text-sm leading-6 text-slate-700">{items.map((item, index) => (
       <li key={`${index}-${item}`} className="flex gap-2"><span aria-hidden="true" className="text-teal-600">•</span><span>{item}</span></li>
     ))}</ul></div>;
+}
+
+function QuestionList({text}:{text?:string}) {
+  if (!text) return null;
+  const normalized = text.replace(/\\n/g, "\n").trim();
+  let questions = normalized.split(/\r?\n+/).map((item) => item.trim()).filter(Boolean);
+  if (questions.length === 1) {
+    const byQuestionMark = normalized.match(/[^?]+\?/g)?.map((item) => item.trim()) ?? [];
+    const consumed = byQuestionMark.join("").replace(/\s+/g, "");
+    const complete = normalized.replace(/\s+/g, "");
+    if (byQuestionMark.length > 1 && consumed === complete) questions = byQuestionMark;
+  }
+  return <div><h4 className="text-xs font-bold uppercase tracking-[0.12em] text-teal-700">Perguntas para mediação</h4>
+    <ul className="mt-2 space-y-2 text-sm leading-6 text-slate-700">{questions.map((question, index) => (
+      <li key={`${index}-${question}`} className="flex gap-2"><span aria-hidden="true" className="text-teal-600">•</span><span>{question}</span></li>
+    ))}</ul></div>;
+}
+
+function pedagogyField(pedagogy: OrientationPedagogy, ...keys: string[]): string {
+  const record = pedagogy as unknown as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
 }
 
 export default function OrientationClient({id}:{id:string}) {
@@ -81,8 +107,16 @@ export default function OrientationClient({id}:{id:string}) {
     <section className="space-y-5"><h2 className="text-xl font-bold">2. Orientação por habilidade</h2>
       {data.habilidades.map((skill) => {
         const p = skill.pedagogia;
-        const hasHow = Boolean(p?.antesDaQuestao || p?.duranteAQuestao || p?.depoisDaQuestao);
-        const hasIntervention = Boolean(p?.retomada || p?.mediacao || p?.consolidacao || p?.orientacoesIntervencao);
+        const verboCentral = p ? pedagogyField(p, "verboCentral", "verbo_central") : "";
+        const perguntasDiagnosticas = p ? pedagogyField(p, "perguntasDiagnosticas", "perguntas_diagnosticas") : "";
+        const antesDaQuestao = p ? pedagogyField(p, "antesDaQuestao", "antes_da_questao", "como_trabalhar_antes") : "";
+        const duranteAQuestao = p ? pedagogyField(p, "duranteAQuestao", "durante_a_questao", "como_trabalhar_durante") : "";
+        const depoisDaQuestao = p ? pedagogyField(p, "depoisDaQuestao", "depois_da_questao", "como_trabalhar_depois") : "";
+        const retomada = p ? pedagogyField(p, "retomada", "intervencao_retomada") : "";
+        const mediacao = p ? pedagogyField(p, "mediacao", "intervencao_mediacao") : "";
+        const consolidacao = p ? pedagogyField(p, "consolidacao", "intervencao_consolidacao") : "";
+        const hasHow = Boolean(antesDaQuestao || duranteAQuestao || depoisDaQuestao);
+        const hasIntervention = Boolean(retomada || mediacao || consolidacao || p?.orientacoesIntervencao);
         return <article key={`${skill.area}-${skill.competencia}-${skill.habilidade}`} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="text-sm font-bold text-teal-700">{skill.area} · {skill.componente}</p>
@@ -106,7 +140,7 @@ export default function OrientationClient({id}:{id:string}) {
             <section className="mt-7 border-t border-slate-100 pt-6">
               <h3 className="text-lg font-bold text-slate-950">O que esta habilidade exige do estudante</h3>
               <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 rounded-2xl bg-slate-50 px-5 py-4">
-                <TextBlock title="Verbo central" text={p.verboCentral} />
+                <TextBlock title="Verbo central" text={verboCentral} />
                 <TextBlock title="Operação cognitiva" text={p.operacaoCognitiva} />
               </div>
               <div className="mt-5"><TextBlock title="Interpretação pedagógica" text={p.interpretacaoPedagogica} /></div>
@@ -124,16 +158,16 @@ export default function OrientationClient({id}:{id:string}) {
               <h3 className="text-lg font-bold text-slate-950">Onde pode haver dificuldade</h3>
               <div className="mt-4 grid gap-6 md:grid-cols-2">
                 <ListBlock title="Dificuldades frequentes" text={p.dificuldadesFrequentes} />
-                <ListBlock title="Perguntas para mediação" text={p.perguntasDiagnosticas} />
+                <QuestionList text={perguntasDiagnosticas} />
               </div>
             </section>
 
             {hasHow ? <section className="mt-7 border-t border-slate-100 pt-6"><h3 className="text-lg font-bold text-slate-950">Como conduzir a atividade</h3><div className="mt-4 grid gap-4 md:grid-cols-3">
-              <GuidanceCard title="Antes" text={p.antesDaQuestao} /><GuidanceCard title="Durante" text={p.duranteAQuestao} /><GuidanceCard title="Depois" text={p.depoisDaQuestao} />
+              <GuidanceCard title="Antes" text={antesDaQuestao} /><GuidanceCard title="Durante" text={duranteAQuestao} /><GuidanceCard title="Depois" text={depoisDaQuestao} />
             </div></section> : null}
 
             {hasIntervention ? <section className="mt-7 border-t border-slate-100 pt-6"><h3 className="text-lg font-bold text-slate-950">Intervenção pedagógica</h3><div className="mt-4 grid gap-4 md:grid-cols-3">
-              <GuidanceCard title="Retomada" text={p.retomada} /><GuidanceCard title="Mediação" text={p.mediacao} /><GuidanceCard title="Consolidação" text={p.consolidacao} />
+              <GuidanceCard title="Retomada" text={retomada} /><GuidanceCard title="Mediação" text={mediacao} /><GuidanceCard title="Consolidação" text={consolidacao} />
             </div>{p.orientacoesIntervencao ? <div className="mt-5"><TextBlock title="Orientações aprovadas" text={p.orientacoesIntervencao} /></div> : null}</section> : null}
           </> : <p className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Conteúdo pedagógico aprovado ainda não cadastrado para esta habilidade.</p>}
 

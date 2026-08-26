@@ -719,6 +719,199 @@ function auditarCargaRealMatrizEnemPedagogicaCNV01430() {
   return resultado;
 }
 
+/**
+ * Promoção administrativa dos 29 rascunhos CN auditados — V0.14.40.
+ * Altera exclusivamente status_revisao, revisado_por e revisado_em.
+ */
+function aprovarRascunhosMatrizEnemPedagogicaCNV01440() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    auditarCargaRealMatrizEnemPedagogicaCNV01430();
+    const revisor = String(
+      Session.getActiveUser().getEmail() || Session.getEffectiveUser().getEmail() || ''
+    ).trim().toLowerCase();
+    if (!revisor) {
+      throw new Error('Não foi possível identificar o revisor autenticado; promoção cancelada.');
+    }
+
+    const ss = obterSpreadsheetOfflineSyncV070_();
+    const aba = ss.getSheetByName(MATRIZ_ENEM_PEDAGOGICA_V01320.ABA);
+    if (!aba) throw new Error('Aba MATRIZ_ENEM_PEDAGOGICA não encontrada.');
+    const headers = aba.getRange(1, 1, 1, aba.getLastColumn()).getDisplayValues()[0]
+      .map(function(header) { return String(header || '').trim(); });
+    validarSchemaMatrizCNV01430_(headers);
+    const idx = headers.reduce(function(mapa, header, indice) {
+      mapa[header] = indice;
+      return mapa;
+    }, {});
+    const totalLinhas = Math.max(aba.getLastRow() - 1, 0);
+    const intervalo = aba.getRange(2, 1, totalLinhas, headers.length);
+    const linhas = intervalo.getValues();
+    const formulas = intervalo.getFormulas();
+    const registros = obterConteudoMatrizEnemPedagogicaCNV01430_();
+    validarConteudoMatrizEnemPedagogicaCNV01430_(registros);
+    const porChave = mapearChavesMatrizCNV01440_(linhas, idx);
+    const alvos = [];
+
+    registros.forEach(function(registro) {
+      const chave = ['CN', registro.competencia, registro.habilidade].join('|');
+      const item = porChave[chave];
+      if (!item) throw new Error('Habilidade ausente antes da promoção: ' + chave + '.');
+      if (registro.habilidade === 'H24') {
+        validarH24PreservadaCNV01430_(item.valores, idx);
+        return;
+      }
+      Object.keys(registro).forEach(function(campo) {
+        const atual = textoMatrizCNV01430_(item.valores[idx[campo]]);
+        const esperado = textoMatrizCNV01430_(registro[campo]);
+        if (atual !== esperado) {
+          throw new Error('Divergência antes da promoção em ' + chave + ' no campo ' +
+            campo + ': esperado ' + JSON.stringify(esperado) + '; encontrado ' +
+            JSON.stringify(atual) + '.');
+        }
+      });
+      alvos.push(item);
+    });
+    if (alvos.length !== 29) {
+      throw new Error('Quantidade inválida de rascunhos para promoção: ' + alvos.length + '.');
+    }
+
+    const linhasAlvo = new Set(alvos.map(function(item) { return item.indice; }));
+    const fingerprintAntes = fingerprintCamposProtegidosMatrizCNV01440_(
+      linhas, formulas, idx, linhasAlvo);
+    const colunaRevisor = colunaA1MatrizCNV01440_(idx.revisado_por + 1);
+    const colunaData = colunaA1MatrizCNV01440_(idx.revisado_em + 1);
+    const colunaStatus = colunaA1MatrizCNV01440_(idx.status_revisao + 1);
+    const linhasPlanilha = alvos.map(function(item) { return item.indice + 2; });
+    const agora = new Date();
+
+    aba.getRangeList(linhasPlanilha.map(function(numeroLinha) {
+      return colunaRevisor + numeroLinha;
+    })).setValue(revisor);
+    aba.getRangeList(linhasPlanilha.map(function(numeroLinha) {
+      return colunaData + numeroLinha;
+    })).setValue(agora);
+    aba.getRangeList(linhasPlanilha.map(function(numeroLinha) {
+      return colunaStatus + numeroLinha;
+    })).setValue('Aprovado');
+
+    const intervaloDepois = aba.getRange(2, 1, totalLinhas, headers.length);
+    const relidas = intervaloDepois.getValues();
+    const formulasDepois = intervaloDepois.getFormulas();
+    const fingerprintDepois = fingerprintCamposProtegidosMatrizCNV01440_(
+      relidas, formulasDepois, idx, linhasAlvo);
+    if (fingerprintDepois !== fingerprintAntes) {
+      throw new Error('Campo protegido foi alterado durante a promoção.');
+    }
+    validarCargaAprovadaMatrizCNV01440_(relidas, idx, registros, revisor);
+
+    const resultado = {
+      ok: true,
+      totalCN: 30,
+      promovidos: 29,
+      porStatus: { Aprovado: 30, Rascunho: 0 },
+      h24Preservada: true,
+      revisor: revisor,
+      divergencias: 0,
+      duplicidades: 0
+    };
+    Logger.log(JSON.stringify(resultado));
+    return resultado;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function mapearChavesMatrizCNV01440_(linhas, idx) {
+  const porChave = {};
+  linhas.forEach(function(linha, indice) {
+    const area = textoMatrizCNV01430_(linha[idx.area]).toUpperCase();
+    const competencia = textoMatrizCNV01430_(linha[idx.competencia]).toUpperCase();
+    const habilidade = textoMatrizCNV01430_(linha[idx.habilidade]).toUpperCase();
+    if (!area && !competencia && !habilidade) return;
+    const chave = [area, competencia, habilidade].join('|');
+    if (porChave[chave]) {
+      throw new Error('Chave duplicada antes da promoção: ' + chave + '. Linhas: ' +
+        (porChave[chave].indice + 2) + ', ' + (indice + 2) + '.');
+    }
+    porChave[chave] = { indice: indice, valores: linha };
+  });
+  return porChave;
+}
+
+function fingerprintCamposProtegidosMatrizCNV01440_(linhas, formulas, idx, linhasAlvo) {
+  const governanca = new Set([idx.status_revisao, idx.revisado_por, idx.revisado_em]);
+  return JSON.stringify(linhas.map(function(linha, indice) {
+    const excluirGovernanca = linhasAlvo.has(indice);
+    return {
+      numeroLinha: indice + 2,
+      celulas: linha.map(function(valor, coluna) {
+        if (excluirGovernanca && governanca.has(coluna)) return null;
+        return {
+          valor: serializarValorMatrizCNV01430_(valor),
+          formula: String((formulas[indice] || [])[coluna] || '')
+        };
+      })
+    };
+  }));
+}
+
+function validarCargaAprovadaMatrizCNV01440_(linhas, idx, registros, revisor) {
+  const porChave = mapearChavesMatrizCNV01440_(linhas, idx);
+  const linhasCN = linhas.filter(function(linha) {
+    return textoMatrizCNV01430_(linha[idx.area]).toUpperCase() === 'CN';
+  });
+  if (linhasCN.length !== 30) {
+    throw new Error('Quantidade inválida de registros CN após promoção: ' + linhasCN.length + '.');
+  }
+  let aprovados = 0;
+  registros.forEach(function(registro) {
+    const chave = ['CN', registro.competencia, registro.habilidade].join('|');
+    const item = porChave[chave];
+    if (!item) throw new Error('Habilidade ausente após promoção: ' + chave + '.');
+    if (registro.habilidade === 'H24') {
+      validarH24PreservadaCNV01430_(item.valores, idx);
+    } else {
+      Object.keys(registro).forEach(function(campo) {
+        if (campo === 'status_revisao' || campo === 'revisado_por' ||
+            campo === 'revisado_em') return;
+        if (textoMatrizCNV01430_(item.valores[idx[campo]]) !==
+            textoMatrizCNV01430_(registro[campo])) {
+          throw new Error('Conteúdo divergente após promoção em ' + chave + ': ' + campo + '.');
+        }
+      });
+      if (textoMatrizCNV01430_(item.valores[idx.status_revisao]) !== 'Aprovado') {
+        throw new Error('Status não aprovado após promoção em ' + chave + '.');
+      }
+      if (textoMatrizCNV01430_(item.valores[idx.revisado_por]).toLowerCase() !== revisor) {
+        throw new Error('Revisor divergente após promoção em ' + chave + '.');
+      }
+      if (!item.valores[idx.revisado_em]) {
+        throw new Error('Data de revisão ausente após promoção em ' + chave + '.');
+      }
+    }
+    if (textoMatrizCNV01430_(item.valores[idx.status_revisao]) === 'Aprovado') {
+      aprovados += 1;
+    }
+  });
+  if (aprovados !== 30) {
+    throw new Error('Quantidade inválida de aprovados após promoção: ' + aprovados + '.');
+  }
+  return true;
+}
+
+function colunaA1MatrizCNV01440_(numeroColuna) {
+  let coluna = '';
+  let numero = numeroColuna;
+  while (numero > 0) {
+    const resto = (numero - 1) % 26;
+    coluna = String.fromCharCode(65 + resto) + coluna;
+    numero = Math.floor((numero - 1) / 26);
+  }
+  return coluna;
+}
+
 function validarConteudoMatrizEnemPedagogicaCNV01430_(registros) {
   if (registros.length !== 30) throw new Error('A matriz CN deve conter exatamente 30 habilidades.');
   const faixas = { C1:[1,4], C2:[5,7], C3:[8,12], C4:[13,16], C5:[17,19], C6:[20,23], C7:[24,27], C8:[28,30] };

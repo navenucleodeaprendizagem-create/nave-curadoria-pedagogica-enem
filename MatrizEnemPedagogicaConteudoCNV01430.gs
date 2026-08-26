@@ -597,6 +597,128 @@ function carregarRascunhosMatrizEnemPedagogicaCNV01430() {
   }
 }
 
+/**
+ * Auditoria administrativa pós-carga. Esta função é estritamente somente leitura.
+ */
+function auditarCargaRealMatrizEnemPedagogicaCNV01430() {
+  const ss = obterSpreadsheetOfflineSyncV070_();
+  const aba = ss.getSheetByName(MATRIZ_ENEM_PEDAGOGICA_V01320.ABA);
+  if (!aba) {
+    throw new Error('Aba MATRIZ_ENEM_PEDAGOGICA não encontrada.');
+  }
+
+  const headers = aba.getRange(1, 1, 1, aba.getLastColumn()).getDisplayValues()[0]
+    .map(function(header) { return String(header || '').trim(); });
+  validarSchemaMatrizCNV01430_(headers);
+  const idx = headers.reduce(function(mapa, header, indice) {
+    mapa[header] = indice;
+    return mapa;
+  }, {});
+  const linhas = aba.getLastRow() > 1
+    ? aba.getRange(2, 1, aba.getLastRow() - 1, headers.length).getValues()
+    : [];
+  const registrosModulo = obterConteudoMatrizEnemPedagogicaCNV01430_();
+  validarConteudoMatrizEnemPedagogicaCNV01430_(registrosModulo);
+
+  const linhasCN = [];
+  let linhasNaoCN = 0;
+  linhas.forEach(function(linha, indice) {
+    const area = textoMatrizCNV01430_(linha[idx.area]).toUpperCase();
+    if (area === 'CN') linhasCN.push({ numeroLinha: indice + 2, valores: linha });
+    else if (area) linhasNaoCN += 1;
+  });
+  const porChave = {};
+  linhasCN.forEach(function(item) {
+    const linha = item.valores;
+    const chave = [linha[idx.area], linha[idx.competencia], linha[idx.habilidade]]
+      .map(function(valor) { return textoMatrizCNV01430_(valor).toUpperCase(); })
+      .join('|');
+    if (porChave[chave]) {
+      throw new Error('Chave CN duplicada: ' + chave + '. Linhas: ' +
+        porChave[chave].numeroLinha + ', ' + item.numeroLinha + '.');
+    }
+    porChave[chave] = item;
+  });
+  if (linhasCN.length !== 30) {
+    throw new Error('Quantidade inválida de registros CN: esperado 30; encontrado ' +
+      linhasCN.length + '.');
+  }
+
+  const porCompetencia = {};
+  const porStatus = {};
+  linhasCN.forEach(function(item) {
+    const linha = item.valores;
+    const competencia = textoMatrizCNV01430_(linha[idx.competencia]).toUpperCase();
+    const status = textoMatrizCNV01430_(linha[idx.status_revisao]);
+    porCompetencia[competencia] = (porCompetencia[competencia] || 0) + 1;
+    porStatus[status] = (porStatus[status] || 0) + 1;
+  });
+  const distribuicaoEsperada = { C1:4, C2:3, C3:5, C4:4, C5:3, C6:4, C7:4, C8:3 };
+  if (Object.keys(porCompetencia).length !== 8) {
+    throw new Error('Quantidade inválida de competências CN: esperado 8; encontrado ' +
+      Object.keys(porCompetencia).length + '.');
+  }
+  Object.keys(distribuicaoEsperada).forEach(function(competencia) {
+    if (porCompetencia[competencia] !== distribuicaoEsperada[competencia]) {
+      throw new Error('Distribuição inválida em ' + competencia + ': esperado ' +
+        distribuicaoEsperada[competencia] + '; encontrado ' +
+        (porCompetencia[competencia] || 0) + '.');
+    }
+  });
+  if (Object.keys(porStatus).length !== 2 || porStatus.Aprovado !== 1 ||
+      porStatus.Rascunho !== 29) {
+    throw new Error('Distribuição de status inválida. Esperado Aprovado=1 e Rascunho=29; ' +
+      'encontrado ' + JSON.stringify(porStatus) + '.');
+  }
+
+  let rascunhosIdenticosAoModulo = 0;
+  let componentesVazios = 0;
+  registrosModulo.forEach(function(registro, indice) {
+    const habilidadeEsperada = 'H' + (indice + 1);
+    if (registro.habilidade !== habilidadeEsperada) {
+      throw new Error('Lacuna na sequência do módulo: esperado ' + habilidadeEsperada + '.');
+    }
+    const chave = ['CN', registro.competencia, registro.habilidade].join('|');
+    const item = porChave[chave];
+    if (!item) throw new Error('Habilidade ausente na carga real: ' + chave + '.');
+    const linha = item.valores;
+    if (registro.habilidade === 'H24') {
+      validarH24PreservadaCNV01430_(linha, idx);
+      if (textoMatrizCNV01430_(linha[idx.versao]) !== '1.0') {
+        throw new Error('Divergência em CN|C7|H24 no campo versao: esperado 1.0; encontrado ' +
+          textoMatrizCNV01430_(linha[idx.versao]) + '.');
+      }
+      return;
+    }
+    Object.keys(registro).forEach(function(campo) {
+      const esperado = textoMatrizCNV01430_(registro[campo]);
+      const atual = textoMatrizCNV01430_(linha[idx[campo]]);
+      if (atual !== esperado) {
+        throw new Error('Divergência em ' + chave + ' no campo ' + campo +
+          ': esperado ' + JSON.stringify(esperado) + '; encontrado ' +
+          JSON.stringify(atual) + '.');
+      }
+    });
+    rascunhosIdenticosAoModulo += 1;
+    if (textoMatrizCNV01430_(linha[idx.componente]) === '') componentesVazios += 1;
+  });
+
+  const resultado = {
+    ok: true,
+    totalCN: 30,
+    porCompetencia: porCompetencia,
+    porStatus: porStatus,
+    h24Preservada: true,
+    rascunhosIdenticosAoModulo: rascunhosIdenticosAoModulo,
+    componentesVazios: componentesVazios,
+    duplicidades: 0,
+    divergencias: 0,
+    linhasNaoCN: linhasNaoCN
+  };
+  Logger.log(JSON.stringify(resultado));
+  return resultado;
+}
+
 function validarConteudoMatrizEnemPedagogicaCNV01430_(registros) {
   if (registros.length !== 30) throw new Error('A matriz CN deve conter exatamente 30 habilidades.');
   const faixas = { C1:[1,4], C2:[5,7], C3:[8,12], C4:[13,16], C5:[17,19], C6:[20,23], C7:[24,27], C8:[28,30] };
